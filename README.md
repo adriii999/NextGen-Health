@@ -1,28 +1,53 @@
-# Hackathon Project Repository
+# NextGen Health
 
-Welcome! This is your team's repository for developing and delivering your hackathon project.
+Prototipo para detectar de forma temprana posibles señales de riesgo cardiovascular oculto en pacientes de Atención Primaria. El proyecto busca ayudar a los profesionales a priorizar casos y facilitar la toma de decisiones preventivas sin añadir carga administrativa.
 
-## Where to work
+> **Estado:** proyecto en desarrollo para un Datathon. El modelo y la aplicación descritos son una propuesta de MVP, no una herramienta clínica validada ni un sustituto del criterio profesional.
 
-Find your team's repository on the [organisation's repositories page](https://github.com/orgs/HackathonBoehringerIT/repositories).
+## Objetivo
 
-Use only the private repository assigned to your team. Your teammates can access it after accepting their organisation invitations. Do not work in `base_template`; it is a shared, read-only starting point.
+Identificar pacientes cuyo riesgo cardiovascular podría pasar desapercibido al valorar resultados analíticos de forma aislada, prestando especial atención a factores renales como la tasa de filtración glomerular estimada (eGFR) y el cociente albúmina/creatinina en orina (UACR).
 
-Your team can work in this repository throughout the hackathon. It is the one place to deliver your project—do not create or submit a separate repository.
+La propuesta combina una API y una interfaz web. Para cada paciente, el sistema devolverá una probabilidad estimada, un nivel de alerta y factores explicativos del resultado.
 
-## Submission deadline
+## Stack propuesto
 
-The organisers will announce the final deadline and its time zone. **Any work uploaded after that deadline will not be taken into account.**
+- **Frontend:** React con Vite, Tailwind CSS, Axios, Lucide y Recharts.
+- **Backend:** FastAPI y Pydantic (Python 3.10 o superior).
+- **Modelo:** XGBoost, con persistencia mediante Joblib y explicabilidad con SHAP.
 
-Before the deadline, make sure the final version is committed and pushed to the repository's `main` branch. If you use a pull request, merge it before the deadline; work left only on another branch or in an unmerged pull request may not be included in the final review.
+## Datos y modelo
 
-You only need to deliver your project through this repository. You do **not** need to wait until the end to upload it: it is recommended that you make commits throughout the project, recording the different stages of your planning, development, and final result. This gives your team a useful history of how the project evolved.
+La propuesta parte del *Cardiovascular Disease Dataset* de Kaggle y contempla generar variables sintéticas correlacionadas para diabetes y función renal. El dataset disponible actualmente en `data/raw/dataset.csv` es provisional y se sustituirá por el dataset definitivo.
 
-## Before the deadline
+Variables previstas para el modelo:
 
-- Confirm the final version is present on the `main` branch.
-- Make sure any pull requests containing final work have been merged.
-- Open the important files on GitHub and check that they render or download correctly.
-- Confirm the work was committed and pushed before the announced deadline and time zone.
+- Edad, sexo, presión arterial sistólica y diastólica, colesterol, tabaquismo e IMC.
+- Diabetes, eGFR y UACR.
+- **Objetivo (`cardio`):** presencia de enfermedad cardiovascular.
 
-If you cannot access your team's repository, cannot push, or are unsure whether your work was submitted in time, contact an organiser as soon as possible.
+El preprocesamiento previsto incluye filtrar presiones fuera de los rangos definidos en la propuesta, eliminar registros con presión diastólica mayor o igual a la sistólica y excluir IMC fuera de 15–60. Los valores nulos no se imputarán; XGBoost deberá gestionarlos de forma nativa.
+
+La métrica principal de entrenamiento será *recall* (sensibilidad), ajustando el umbral de decisión. AUC-ROC y matriz de confusión servirán como métricas complementarias.
+
+## API propuesta
+
+El endpoint `POST /predict` recibirá variables clínicas validadas con Pydantic y devolverá la probabilidad estimada, el nivel de alerta, factores clave explicados con SHAP y un mensaje clínico orientativo. El contrato detallado y los ejemplos están en [docs/Arquitectura-propuesta-reto1.md](docs/Arquitectura-propuesta-reto1.md).
+
+## Estructura del repositorio
+
+```text
+NextGen-Health/
+|-- app/          # Interfaz web y API
+|-- data/         # Datos originales y procesados
+|-- docs/         # Enunciado y documentación
+|-- model/        # Preparación, entrenamiento y artefactos del modelo
+|-- scripts/      # Automatizaciones y utilidades generales
+\-- README.md
+```
+
+Consulta el árbol detallado en [docs/estructura-repo.md](docs/estructura-repo.md) y el reto original en [docs/Enunciado-Reto1.docx](docs/Enunciado-Reto1.docx).
+
+## Estado de implementación
+
+El repositorio contiene la documentación inicial y un dataset provisional. Las carpetas de frontend, backend y entrenamiento están preparadas; la aplicación, el pipeline de datos y el modelo todavía están pendientes de implementación.
