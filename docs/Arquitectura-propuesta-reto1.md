@@ -29,9 +29,10 @@ Dado que los datasets abiertos estándar no suelen registrar determinaciones de 
 
 ---
 
-## 3. Definición del Dataset y Trazabilidad de Variables por Fuente
+## 3. Definición del Dataset y Trazabilidad de Variables
 
-El dataset unificado de entrenamiento y evaluación integra las siguientes variables clínicas:
+### 3.1 Variables de Entrada (Features utilizadas para Inferencia y Consulta)
+Estas son las **únicas 10 variables** que entran al modelo y que viajan en el payload de la API desde la analítica del paciente o el simulador:
 
 | Variable Modelo | Nombre Clínico | Tipo / Rango | Fuente de Origen | Justificación Médica |
 | :--- | :--- | :--- | :--- | :--- |
@@ -45,7 +46,12 @@ El dataset unificado de entrenamiento y evaluación integra las siguientes varia
 | `diabetes` | Presencia de Diabetes Mellitus | Binario: 0 = No, 1 = Sí | **Fuente 1** (`Diabetes` / `Nivel_Glucosa`) / **Fuente 2** (`gluc`) | Factor clave en el perfil de la Dra. Carmen; duplica el riesgo vascular y renal. |
 | `egfr` | Tasa Filtración Glomerular | $\text{mL/min}/1.73\text{m}^2$ (15.0 – 120.0) | **Síntesis Clínica Calibrada** (guía KDIGO) | Función renal oculta; $<60\text{ mL/min}$ multiplica eventos de insuficiencia cardíaca. |
 | `uacr` | Cociente Albúmina/Creatinina | $\text{mg/g}$ (2.0 – 300.0) | **Síntesis Clínica Calibrada** (guía KDIGO) | Daño microvascular renal silencioso; $\ge 30\text{ mg/g}$ indica microalbuminuria patológica. |
-| `target_cardio` | Evento / Riesgo CV | Binario: 0 = Sano, 1 = Riesgo | **Fuente 1** (`Riesgo_Cardiovascular`) / **Fuente 2** (`cardio`) | Variable objetivo principal para el entrenamiento supervisado. |
+
+### 3.2 Etiquetas de Entrenamiento (Targets en Fase de Aprendizaje Supervisado)
+> [!NOTE]
+> Estas variables existen **únicamente en los archivos CSV históricos durante el entrenamiento del modelo** (para que el algoritmo aprenda a relacionar las entradas con el desenlace médico real o evento sucedido). **Nunca forman parte de la entrada de la API ni de la consulta médica**, ya que son precisamente lo que el modelo predice.
+
+* `target_cardio`: Evento cardiovascular histórico en los datasets (0 = No evento, 1 = Evento cardiovascular registrado). Se utiliza como etiqueta de supervisión para calibrar la función de coste y optimizar la sensibilidad (Recall).
 
 ---
 
@@ -69,10 +75,29 @@ El dataset unificado de entrenamiento y evaluación integra las siguientes varia
 
 ## 5. Diseño de la API (FastAPI)
 
+Las rutas de la API quedan simplificadas sin prefijo de versionado innecesario:
+
 ### 5.1 Endpoints Principales
-* `GET /api/v1/pacientes`: Recupera el listado de pacientes del cupo de Carmen con sus analíticas precargadas.
-* `POST /api/v1/pacientes/{id}/analizar`: **(Flujo Principal en 1 Clic)** Ejecuta la segunda opinión médica automática sobre la analítica registrada del paciente.
-* `POST /api/v1/analyze`: **(Modo Simulador / Demo)** Permite enviar un JSON con los 10 valores manualmente y devuelve el diagnóstico multidimensional con SHAP.
+* `GET /api/pacientes`: Recupera el listado de pacientes del cupo de Carmen con sus analíticas precargadas.
+* `POST /api/pacientes/{id}/predict`: **(Flujo Principal en 1 Clic)** Ejecuta la segunda opinión médica automática sobre la analítica registrada del paciente.
+* `POST /api/predict`: **(Modo Simulador / Demo)** Permite enviar un JSON con los 10 valores manualmente y devuelve el diagnóstico multidimensional con SHAP.
+
+#### Payload de Entrada (`POST /api/predict`):
+```json
+{
+  "paciente_id": "PAC-4892",
+  "edad": 58,
+  "sexo": 1,
+  "bmi": 27.2,
+  "ap_hi": 138,
+  "ap_lo": 86,
+  "colesterol": 1,
+  "fuma": 0,
+  "diabetes": 1,
+  "egfr": 68.0,
+  "uacr": 38.5
+}
+```
 
 #### Formato de Respuesta Multidimensional:
 ```json
@@ -100,7 +125,7 @@ El dataset unificado de entrenamiento y evaluación integra las siguientes varia
 ## 6. Vistas de Usuario (Frontend React + Tailwind)
 1. **Vista Principal (Cupo de Atención Primaria - 1 Clic):**
    * Tabla con el cupo de pacientes y analíticas precargadas.
-   * Botón de acción: *"Obtener Segunda Opinión"*.
+   * Botón de acción: *"Obtener Segunda Opinión"* que llama a `POST /api/pacientes/{id}/predict`.
    * Panel de resultados: Tarjetas con los 3 tipos de riesgo, gráfico de radares/barras comparando valor vs. umbral, desglose SHAP y recomendación clínica.
 2. **Vista Secundaria (Simulador de Analítica):**
-   * Formulario de 10 parámetros para ajustar valores manualmente y ver los cambios dinámicos en los tipos de riesgo.
+   * Formulario de 10 parámetros que llama a `POST /api/predict` para ajustar valores manualmente y ver los cambios dinámicos en los tipos de riesgo.
