@@ -20,6 +20,18 @@ En una consulta habitual de Atención Primaria, el tiempo por paciente es de ape
 
 ---
 
+## 📊 Fuentes de Datos y Variables
+
+Para respetar la privacidad de datos clínicos de España (RGPD) y dotar al modelo de precisión estadística y contextual, se emplea una estrategia híbrida:
+
+1. **Fuente 1 (Principal - Población España):** [NutriSynthCare - Salud, Diabetes y Riesgo CV en España](https://www.kaggle.com/datasets/danicruzdevtech/datasets-sintticos-de-salud-diabetes-cardio). Proporciona `Edad`, `Genero`, `IMC`, `Presion_Arterial`, `Colesterol`, `Nivel_Glucosa`/`Diabetes`, `Fumador` y `Riesgo_Cardiovascular`.
+2. **Fuente 2 (Apoyo Estadístico y Volumen):** [Cardiovascular Disease Dataset (Kaggle)](https://www.kaggle.com/datasets/sulianova/cardiovascular-disease-dataset). 70.000 registros para patrones biológicos robustos (`ap_hi`, `ap_lo`, `cholesterol`, `gluc`, `cardio`).
+3. **Síntesis Clínica Calibrada (Función Cardiorrenal):** Inyección de `eGFR` (Tasa de Filtración Glomerular) y `UACR` (Cociente Albúmina/Creatinina) según guías KDIGO para modelar el deterioro silencioso fundamental en el reto de la Dra. Carmen.
+
+Consulta la tabla completa de correspondencia de variables en [docs/Arquitectura-propuesta-reto1.md](docs/Arquitectura-propuesta-reto1.md#3-definición-del-dataset-y-trazabilidad-de-variables-por-fuente).
+
+---
+
 ## 🛠️ Stack Tecnológico
 
 * **Frontend:** React + Vite, Tailwind CSS, Lucide Icons y Recharts.
@@ -33,7 +45,7 @@ En una consulta habitual de Atención Primaria, el tiempo por paciente es de ape
 ```text
 NextGen-Health/
 |-- app/
-|   |-- frontend/      # UI React: Cupo de analíticas + Simulador demo
+|   |-- frontend/      # UI React: Cupo de analíticas (1 Clic) + Simulador demo
 |   \-- backend/       # API FastAPI: /api/v1/analyze y /api/v1/pacientes
 |-- data/
 |   |-- raw/           # Dataset base y datos clínicos originales
@@ -42,10 +54,9 @@ NextGen-Health/
 |   |-- scripts/       # Pipelines de preparación, síntesis y entrenamiento
 |   \-- out/           # Modelos (.joblib) y artefactos SHAP
 |-- docs/
-|   |-- Arquitectura-propuesta-reto1.md   # Especificación técnica detallada
+|   |-- Arquitectura-propuesta-reto1.md   # Especificación técnica detallada y fuentes
 |   |-- Enunciado-Reto1.docx              # Enunciado original del reto
+|   |-- f.md                              # Documento base de fuentes
 |   \-- estructura-repo.md                # Detalle de directorios
 \-- README.md
 ```
-
-Consulta el detalle completo del contrato de la API y modelos en [docs/Arquitectura-propuesta-reto1.md](docs/Arquitectura-propuesta-reto1.md).
