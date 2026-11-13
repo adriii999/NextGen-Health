@@ -1,89 +1,164 @@
-# Especificación Técnica: Sistema de Detección de Riesgo Cardiovascular Oculto
+# Especificación Técnica: Sistema de Detección y Segunda Opinión Multidimensional de Riesgo Cardiovascular
 
-## 1. Contexto del Proyecto (Para el LLM)
-**Objetivo:** Desarrollar un prototipo (MVP) para un Datathon en 48 horas.
-**Problema:** Pacientes con resultados analíticos dentro de rangos "aceptables" que ocultan un alto riesgo cardiovascular, prestando especial atención a factores silenciosos como la función renal y la albuminuria.
-**Solución:** Una herramienta de "segunda opinión" (API + Interfaz) que procesa los datos mediante un modelo predictivo (XGBoost) y devuelve una probabilidad de riesgo (0-100%) junto con los factores clave (XAI con SHAP).
+## 1. Contexto del Proyecto y Flujo de Trabajo Clínico (Para el LLM)
+**Objetivo:** Desarrollar un prototipo (MVP) para el Datathon en 48 horas adaptado a la práctica médica de Atención Primaria (AP) en el Sistema Nacional de Salud.
+**Problema:** En consultas de 5-7 minutos, analíticas rutinarias con valores aparentemente "en rango" o límites ocultan perfiles de alto riesgo específico (aterosclerótico, insuficiencia cardíaca o cardiorrenal). El profesional no dispone de tiempo para introducir datos a mano.
+**Solución ("Segunda Opinión con un Clic"):**
+* **Modo Principal (Consulta Real):** Un botón que envía a analizar la analítica/historial ya cargado del paciente (o lote de analíticas recientes del cupo) para obtener una segunda opinión inmediata e integrada sin carga administrativa extra.
+* **Modo Demo / Laboratorio:** Pestaña secundaria para introducir 10 valores manualmente y simular o ajustar analíticas en tiempo real durante la demo/evaluación.
+* **Salida Multidimensional ("Tipos de Riesgo"):** El sistema no entrega una única cifra ambigua, sino la estratificación de los **tres fenotipos cardiovasculares fundamentales** respaldados por las guías ESC / SEC y ecuaciones PREVENT/SCORE2-HF, concluyendo ausencia de riesgo si ningún umbral se supera.
 
-## 2. Stack Tecnológico
-### Frontend (Interfaz de Usuario)
-* **Framework:** React (Vite).
-* **Estilos:** Tailwind CSS.
-* **Librerías Extra:** `axios`, `lucide-react`, `recharts` (para gráficos simples).
+---
 
-### Backend (API REST)
-* **Framework:** FastAPI (Python 3.10+).
-* **Validación de Datos:** Pydantic.
+## 2. Tipos de Riesgo Clínico Evaluados (Guías ESC / SEC / PREVENT)
 
-### Machine Learning
-* **Modelo Algorítmico:** XGBoost (`xgboost`).
-* **Persistencia:** `joblib`.
-* **Explicabilidad (XAI):** `shap` (para explicar por qué el modelo da ese riesgo).
+Siguiendo las directrices de la **Sociedad Europea de Cardiología (ESC)**, la **Sociedad Española de Cardiología (SEC)** y las ecuaciones multidimensionales **AHA PREVENT**:
 
-## 3. Especificación del Dataset y Preprocesamiento
-### 3.1 Estrategia de Datos (Data Augmentation)
-Para alinear el modelo con las guías médicas actuales (SCORE2 / PREVENT) y la narrativa del reto, se tomará como base el **Cardiovascular Disease Dataset (Kaggle)**, pero el script de entrenamiento deberá **inyectar variables sintéticas** correlacionadas para la función renal y la diabetes, emulando historiales clínicos reales de Atención Primaria.
+1. **Riesgo Aterosclerótico (ASCVD - Infarto / Ictus):**
+   * *Mecanismo:* Formación de placa ateromatosa, dislipemia e hipertensión vascular.
+   * *Variables clave:* Edad, colesterol total, presión sistólica (`ap_hi`), tabaquismo, sexo.
+   * *Umbral de alerta:* Probabilidad estimada $\ge$ 10% a 10 años (o corte calibrado de alto riesgo).
 
-### 3.2 Diccionario de Variables (Entrada del Modelo)
-**Variables Base:**
-* `age`: Edad en años.
-* `gender`: Sexo (1 = mujer, 2 = hombre).
+2. **Riesgo de Insuficiencia Cardíaca (Heart Failure - IC):**
+   * *Mecanismo:* Sobrecarga hemodinámica, remodelado ventricular temprano, hipertrofia por HTA o toxicidad metabólica.
+   * *Variables clave:* IMC elevado, presión diastólica/sistólica sostenida, diabetes, edad avanzada, microalbuminuria.
+   * *Umbral de alerta:* Probabilidad estimada $\ge$ 8% (SCORE2-HF / PREVENT-HF).
+
+3. **Riesgo Cardiorrenal / Deterioro Renal Silencioso:**
+   * *Mecanismo:* Daño endotelial microvascular y glomerular progresivo ("sin que duela").
+   * *Variables clave:* Cociente Albúmina/Creatinina (`uacr` $\ge 30\text{ mg/g}$), filtrado glomerular (`egfr` $< 60\text{ mL/min}$), diabetes, hipertensión.
+   * *Umbral de alerta:* Caída de eGFR o presencia de micro/macroalbuminuria.
+
+> **Regla de Conclusión Global:** Si ninguno de los tres subtipos supera su umbral clínico, el sistema concluye: **"Sin riesgo cardiovascular significativo detectado (perfil bajo control)"**, evitando fatiga de alarmas al médico. Si al menos uno supera el umbral, se emite una alerta priorizada con el fenotipo predominante y recomendaciones preventivas.
+
+---
+
+## 3. Stack Tecnológico
+* **Frontend:** React (Vite) + Tailwind CSS + Lucide Icons + Recharts (radares y barras para visualización de subtipos de riesgo y SHAP).
+* **Backend:** FastAPI (Python 3.10+) + Pydantic v2.
+* **Machine Learning & XAI:** XGBoost (`xgboost`) con soporte nativo de valores ausentes (`missing=np.nan`), `joblib` para serialización y `shap` para explicabilidad de cada subtipo de riesgo.
+
+---
+
+## 4. Estructura de Datos y Preprocesamiento
+
+### 4.1 Variables Clínicas de Entrada
+* `edad`: Años (30–85).
+* `sexo`: 1 = Mujer, 2 = Hombre.
+* `bmi`: Índice de masa corporal ($\text{peso} / \text{altura}^2$).
 * `ap_hi`: Presión arterial sistólica (mmHg).
 * `ap_lo`: Presión arterial diastólica (mmHg).
-* `cholesterol`: Colesterol total (1: normal, 2: alto, 3: muy alto).
-* `smoke`: Tabaquismo (0 = No, 1 = Sí).
-* `bmi`: Índice de Masa Corporal (calculado a partir de peso y altura).
+* `colesterol`: Nivel (1: normal, 2: limítrofe, 3: elevado).
+* `fuma`: Tabaquismo activo (0 = No, 1 = Sí).
+* `diabetes`: Presencia diagnóstica o glucemia basal alterada (0 = No, 1 = Sí).
+* `egfr`: Tasa de filtración glomerular estimada ($\text{mL/min}/1.73\text{m}^2$).
+* `uacr`: Cociente albúmina/creatinina en orina ($\text{mg/g}$).
 
-**Variables Clínicas Añadidas (Críticas para el Reto):**
-* `diabetes`: Presencia de diabetes (0 = No, 1 = Sí).
-* `egfr`: Tasa de Filtración Glomerular estimada (Función renal. Normal > 90, deterioro < 60 mL/min).
-* `uacr`: Cociente Albúmina/Creatinina en orina (Albuminuria. Normal < 30, riesgo > 30 mg/g).
+### 4.2 Limpieza y Generación de Datos Sintéticos Correlacionados
+* Filtros de rangos fisiológicos: `ap_hi` $\in [80, 220]$, `ap_lo` $\in [50, 130]$, `ap_lo < ap_hi`, `bmi` $\in [15, 60]$.
+* Síntesis cardiorrenal calibrada sobre el dataset base para inducir correlaciones clínicas reales (microalbuminuria en hipertensos/diabéticos y disfunción renal silenciosa).
 
-**Target (`cardio`):**
-* Presencia/Evento de enfermedad cardiovascular (0 = No, 1 = Sí).
-
-### 3.3 Limpieza y Eliminación de Atípicos (Outliers)
-El LLM debe aplicar filtros estrictos antes del entrenamiento:
-1. **Presión Arterial:** Filtrar `ap_hi` fuera del rango [80, 220] y `ap_lo` fuera de [50, 130]. Eliminar registros donde `ap_lo` >= `ap_hi`.
-2. **BMI:** Filtrar valores fuera del rango [15, 60].
-3. **eGFR / UACR (Sintéticos):** Asegurar que pacientes con `cardio=1` tengan mayor probabilidad de presentar `egfr` entre 45-75 (deterioro silencioso) y `uacr` entre 25-150 (microalbuminuria).
-
-### 3.4 Manejo de Valores Nulos
-* **Estrategia:** No imputar valores nulos. XGBoost debe configurarse para manejar `NaN` nativamente (parámetro `missing=np.nan`). Esto simula la realidad clínica donde a un paciente le puede faltar la prueba de orina (UACR).
-
-## 4. Entrenamiento y Métricas
-* **Métrica de Optimización:** Maximizar el **Recall (Sensibilidad)** ajustando el umbral de decisión (*threshold*). Un falso negativo (ignorar a un paciente en riesgo) es inaceptable.
-* **Evaluación secundaria:** AUC-ROC y Matriz de Confusión.
+---
 
 ## 5. Diseño de la API (FastAPI)
-### Payload de Entrada (JSON desde React)
-Definir el modelo Pydantic:
+
+### 5.1 Endpoint Individual / Simulación: `POST /api/v1/analyze`
+Permite analizar una analítica enviada en JSON (sea desde la analítica seleccionada del paciente o desde el formulario manual de demo).
+
+#### Payload de Entrada:
 ```json
 {
+  "paciente_id": "PAC-4892",
   "edad": 58,
   "sexo": 1,
-  "bmi": 26.5,
+  "bmi": 27.2,
   "ap_hi": 138,
-  "ap_lo": 85,
+  "ap_lo": 86,
   "colesterol": 1,
   "fuma": 0,
   "diabetes": 1,
-  "egfr": 68,
-  "uacr": 35
+  "egfr": 68.0,
+  "uacr": 38.5
 }
 ```
-*(Nota: Este perfil representa el "paciente invisible" del reto: todo parece casi normal, pero la combinación de ligera hipertensión, diabetes y microalbuminuria dispara el riesgo).*
 
-### Respuesta del Modelo (JSON hacia React)
-El endpoint `/predict` devolverá:
+#### Respuesta Multidimensional por Tipos de Riesgo:
 ```json
 {
-  "riesgo_probabilidad": 0.86,
-  "nivel_alerta": "ALTA",
+  "paciente_id": "PAC-4892",
+  "hay_riesgo": true,
+  "conclusion_diagnostica": "Riesgo detectado: perfil de deterioro cardiorrenal temprano e insuficiencia cardíaca incipiente con lípidos controlados.",
+  "nivel_prioridad": "ALTA",
+  "tipos_riesgo": {
+    "riesgo_aterosclerotico": {
+      "valor": 0.08,
+      "umbral": 0.10,
+      "alerta": false,
+      "interpretacion": "Bajo (colesterol y hábitos controlados)"
+    },
+    "riesgo_insuficiencia_cardiaca": {
+      "valor": 0.14,
+      "umbral": 0.08,
+      "alerta": true,
+      "interpretacion": "Moderado-Alto (sobrecarga tensional + diabetes)"
+    },
+    "riesgo_cardiorrenal": {
+      "valor": 0.22,
+      "umbral": 0.12,
+      "alerta": true,
+      "interpretacion": "Alto (microalbuminuria UACR 38.5 mg/g con eGFR 68 mL/min)"
+    }
+  },
   "factores_clave": [
-    {"variable": "uacr", "impacto": "+15%", "descripcion": "Albuminuria leve detectada"},
-    {"variable": "egfr", "impacto": "+10%", "descripcion": "Deterioro temprano de función renal"}
+    {
+      "variable": "uacr",
+      "valor_actual": "38.5 mg/g",
+      "impacto": "+14%",
+      "descripcion": "Microalbuminuria activa: marcador precoz de daño vascular renal"
+    },
+    {
+      "variable": "egfr",
+      "valor_actual": "68 mL/min",
+      "impacto": "+11%",
+      "descripcion": "Filtrado glomerular en rango limítrofe estadio G2"
+    },
+    {
+      "variable": "diabetes",
+      "valor_actual": "Sí",
+      "impacto": "+9%",
+      "descripcion": "Multiplicador de riesgo endotelial"
+    }
   ],
-  "mensaje_clinico": "Alerta: Aunque los valores individuales rozan la normalidad, la combinación de deterioro renal silencioso (eGFR 68) y microalbuminuria en contexto diabético eleva el riesgo CV a un 86%."
+  "recomendacion_preventiva": "Solicitar confirmación de UACR en 3 meses, optimizar control de presión arterial sistólica (<130 mmHg) y valorar iSGLT2 para protección cardiorrenal."
 }
 ```
+
+#### Caso Negativo (Ningún umbral superado):
+```json
+{
+  "paciente_id": "PAC-1205",
+  "hay_riesgo": false,
+  "conclusion_diagnostica": "Sin riesgo cardiovascular significativo detectado. Todos los fenotipos se encuentran dentro de los límites de seguridad.",
+  "nivel_prioridad": "BAJA",
+  "tipos_riesgo": {
+    "riesgo_aterosclerotico": { "valor": 0.03, "umbral": 0.10, "alerta": false, "interpretacion": "Bajo" },
+    "riesgo_insuficiencia_cardiaca": { "valor": 0.02, "umbral": 0.08, "alerta": false, "interpretacion": "Bajo" },
+    "riesgo_cardiorrenal": { "valor": 0.04, "umbral": 0.12, "alerta": false, "interpretacion": "Bajo" }
+  },
+  "factores_clave": [],
+  "recomendacion_preventiva": "Continuar con controles habituales de Atención Primaria según protocolo general."
+}
+```
+
+### 5.2 Endpoint de Analíticas Precargadas: `GET /api/v1/pacientes` y `POST /api/v1/pacientes/{id}/analizar`
+Permite a Carmen consultar la lista de pacientes con analíticas recientes ya cargadas en el sistema de salud y ejecutar la segunda opinión con un solo clic.
+
+---
+
+## 6. Vistas de la Interfaz (Frontend React)
+1. **Pestaña Principal: "Analíticas de Cupo (Segunda Opinión en 1 Clic)":**
+   * Tabla con el cupo de pacientes y sus analíticas precargadas.
+   * Botón destacado *"Obtener Segunda Opinión"* para analizar individualmente o en lote.
+   * Visualización del veredicto: tarjetas de los 3 tipos de riesgo (Riesgo Aterosclerótico, Insuficiencia Cardíaca, Cardiorrenal), badges de alerta y factores explicativos SHAP.
+2. **Pestaña Secundaria: "Simulador de Analítica (Demo Manual)":**
+   * Formulario con los 10 valores para introducir analíticas de prueba o modificar variables interactivamente en la defensa del proyecto.

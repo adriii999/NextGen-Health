@@ -1,53 +1,51 @@
-# NextGen Health
+# NextGen Health: Segunda Opinión Multidimensional de Riesgo Cardiovascular
 
-Prototipo para detectar de forma temprana posibles señales de riesgo cardiovascular oculto en pacientes de Atención Primaria. El proyecto busca ayudar a los profesionales a priorizar casos y facilitar la toma de decisiones preventivas sin añadir carga administrativa.
+Herramienta clínica de soporte a la decisión para **Atención Primaria**, diseñada para proporcionar una **segunda opinión en un solo clic** sobre analíticas ya registradas en el sistema de salud, identificando señales de riesgo cardiovascular oculto sin sobrecargar la consulta médica.
 
-> **Estado:** proyecto en desarrollo para un Datathon. El modelo y la aplicación descritos son una propuesta de MVP, no una herramienta clínica validada ni un sustituto del criterio profesional.
+> **Estado:** Prototipo funcional (MVP) desarrollado para el Datathon.
 
-## Objetivo
+---
 
-Identificar pacientes cuyo riesgo cardiovascular podría pasar desapercibido al valorar resultados analíticos de forma aislada, prestando especial atención a factores renales como la tasa de filtración glomerular estimada (eGFR) y el cociente albúmina/creatinina en orina (UACR).
+## 🎯 Enfoque y Propuesta de Valor
 
-La propuesta combina una API y una interfaz web. Para cada paciente, el sistema devolverá una probabilidad estimada, un nivel de alerta y factores explicativos del resultado.
+En una consulta habitual de Atención Primaria, el tiempo por paciente es de apenas 5 a 7 minutos. Analíticas con parámetros individuales dentro de rangos aparentemente "aceptables" o limítrofes pueden enmascarar un riesgo cardiovascular elevado.
 
-## Stack propuesto
+* **Flujo Principal ("Segunda Opinión en 1 Clic"):** Carmen (médica de AP) no necesita teclear datos. Pulsa un botón sobre la analítica precargada del paciente y recibe al instante una evaluación de riesgo multidimensional explicada.
+* **Simulador / Demo ("Entrada Manual"):** Pestaña interactiva para introducir o modificar manualmente los 10 valores clínicos, ideal para presentaciones, docencia o casos no digitalizados.
+* **Salida Multidimensional por Tipos de Riesgo:** Basada en las directrices de la **Sociedad Europea de Cardiología (ESC)**, la **Sociedad Española de Cardiología (SEC)** y las ecuaciones multidimensionales **AHA PREVENT**:
+  1. **Riesgo Aterosclerótico (ASCVD):** Infarto e ictus por dislipemia, HTA sistólica y tabaquismo.
+  2. **Riesgo de Insuficiencia Cardíaca (IC):** Sobrecarga metabólica y remodelado ventricular (SCORE2-HF / PREVENT-HF).
+  3. **Riesgo Cardiorrenal:** Deterioro precoz de función renal (`eGFR`) y microalbuminuria (`UACR`).
+  * **Criterio de corte:** Si ningún fenotipo supera su umbral clínico, el sistema concluye: *"Sin riesgo significativo detectado (perfil bajo control)"*, evitando fatiga de alertas.
 
-- **Frontend:** React con Vite, Tailwind CSS, Axios, Lucide y Recharts.
-- **Backend:** FastAPI y Pydantic (Python 3.10 o superior).
-- **Modelo:** XGBoost, con persistencia mediante Joblib y explicabilidad con SHAP.
+---
 
-## Datos y modelo
+## 🛠️ Stack Tecnológico
 
-La propuesta parte del *Cardiovascular Disease Dataset* de Kaggle y contempla generar variables sintéticas correlacionadas para diabetes y función renal. El dataset disponible actualmente en `data/raw/dataset.csv` es provisional y se sustituirá por el dataset definitivo.
+* **Frontend:** React + Vite, Tailwind CSS, Lucide Icons y Recharts.
+* **Backend:** FastAPI, Pydantic v2 (Python 3.10+).
+* **Machine Learning & XAI:** XGBoost (`xgboost`) con soporte para nulos clínicos nativos, persistencia con `joblib` y explicabilidad con `shap`.
 
-Variables previstas para el modelo:
+---
 
-- Edad, sexo, presión arterial sistólica y diastólica, colesterol, tabaquismo e IMC.
-- Diabetes, eGFR y UACR.
-- **Objetivo (`cardio`):** presencia de enfermedad cardiovascular.
-
-El preprocesamiento previsto incluye filtrar presiones fuera de los rangos definidos en la propuesta, eliminar registros con presión diastólica mayor o igual a la sistólica y excluir IMC fuera de 15–60. Los valores nulos no se imputarán; XGBoost deberá gestionarlos de forma nativa.
-
-La métrica principal de entrenamiento será *recall* (sensibilidad), ajustando el umbral de decisión. AUC-ROC y matriz de confusión servirán como métricas complementarias.
-
-## API propuesta
-
-El endpoint `POST /predict` recibirá variables clínicas validadas con Pydantic y devolverá la probabilidad estimada, el nivel de alerta, factores clave explicados con SHAP y un mensaje clínico orientativo. El contrato detallado y los ejemplos están en [docs/Arquitectura-propuesta-reto1.md](docs/Arquitectura-propuesta-reto1.md).
-
-## Estructura del repositorio
+## 📂 Estructura del Repositorio
 
 ```text
 NextGen-Health/
-|-- app/          # Interfaz web y API
-|-- data/         # Datos originales y procesados
-|-- docs/         # Enunciado y documentación
-|-- model/        # Preparación, entrenamiento y artefactos del modelo
-|-- scripts/      # Automatizaciones y utilidades generales
+|-- app/
+|   |-- frontend/      # UI React: Cupo de analíticas + Simulador demo
+|   \-- backend/       # API FastAPI: /api/v1/analyze y /api/v1/pacientes
+|-- data/
+|   |-- raw/           # Dataset base y datos clínicos originales
+|   \-- processed/     # Dataset enriquecido con correlación cardiorrenal
+|-- model/
+|   |-- scripts/       # Pipelines de preparación, síntesis y entrenamiento
+|   \-- out/           # Modelos (.joblib) y artefactos SHAP
+|-- docs/
+|   |-- Arquitectura-propuesta-reto1.md   # Especificación técnica detallada
+|   |-- Enunciado-Reto1.docx              # Enunciado original del reto
+|   \-- estructura-repo.md                # Detalle de directorios
 \-- README.md
 ```
 
-Consulta el árbol detallado en [docs/estructura-repo.md](docs/estructura-repo.md) y el reto original en [docs/Enunciado-Reto1.docx](docs/Enunciado-Reto1.docx).
-
-## Estado de implementación
-
-El repositorio contiene la documentación inicial y un dataset provisional. Las carpetas de frontend, backend y entrenamiento están preparadas; la aplicación, el pipeline de datos y el modelo todavía están pendientes de implementación.
+Consulta el detalle completo del contrato de la API y modelos en [docs/Arquitectura-propuesta-reto1.md](docs/Arquitectura-propuesta-reto1.md).
