@@ -27,7 +27,15 @@ ORDERED_FEATURES = [
     "delta_egfr", "delta_uacr", "delta_ap_hi", "delta_colesterol", "delta_bmi"
 ]
 TARGET_COLUMN = "target_cardio"
-ALL_COLUMNS = ORDERED_FEATURES + [TARGET_COLUMN]
+TARGET_ATEROSCLEROTICO = "target_aterosclerotico"
+TARGET_INSUFICIENCIA_CARDIACA = "target_insuficiencia_cardiaca"
+TARGET_CARDIORRENAL = "target_cardiorrenal"
+ALL_COLUMNS = ORDERED_FEATURES + [
+    TARGET_COLUMN,
+    TARGET_ATEROSCLEROTICO,
+    TARGET_INSUFICIENCIA_CARDIACA,
+    TARGET_CARDIORRENAL,
+]
 
 
 def filter_physiological_outliers(df: pd.DataFrame) -> pd.DataFrame:
@@ -344,6 +352,46 @@ def synthesize_cardiorenal_and_deltas(base_df: pd.DataFrame, random_seed: int = 
         (df["uacr"] >= 150.0)
     )
     df["target_cardio"] = np.where(is_renal_adverse, 1, df["target_cardio"])
+
+    # --------------------------------------------------------------------------
+    # 6. GENERACIÓN DE LOS TRES OBJETIVOS FENOTÍPICOS (MULTI-RIESGO CLÍNICO)
+    # --------------------------------------------------------------------------
+    # A) Fenotipo Aterosclerótico (ASCVD / Placa / Isquemia):
+    is_ath = (
+        (df["target_cardio"] == 1) & (
+            (df["colesterol_total"] >= 190.0) |
+            (df["fuma"] == 1) |
+            (df["ap_hi"] >= 135.0) |
+            (df["delta_colesterol"].fillna(0.0) >= 4.0)
+        )
+    ) | (
+        (df["colesterol_total"] >= 230.0) & (df["fuma"] == 1) & (df["ap_hi"] >= 140.0)
+    )
+    df["target_aterosclerotico"] = is_ath.astype(int)
+
+    # B) Fenotipo Insuficiencia Cardíaca (Sobrecarga hemodinámica / cardiometabólica):
+    is_hf = (
+        (df["target_cardio"] == 1) & (
+            (df["ap_hi"] >= 135.0) |
+            (df["bmi"] >= 28.0) |
+            (df["diabetes"] == 1) |
+            (df["delta_ap_hi"].fillna(0.0) >= 4.0)
+        )
+    ) | (
+        (df["ap_hi"] >= 150.0) & (df["bmi"] >= 30.0) & (df["diabetes"] == 1)
+    )
+    df["target_insuficiencia_cardiaca"] = is_hf.astype(int)
+
+    # C) Fenotipo Cardiorrenal (KDIGO 2024 / Deterioro silente / Albuminuria):
+    is_ren = (
+        (df["delta_egfr"].fillna(0.0) <= -5.0) |
+        (df["uacr"] >= 30.0) |
+        (df["delta_uacr"].fillna(0.0) >= 8.0) |
+        (df["egfr"] < 60.0) |
+        ((df["diabetes"] == 1) & ((df["uacr"] >= 20.0) | (df["delta_egfr"].fillna(0.0) <= -3.0))) |
+        ((df["target_cardio"] == 1) & ((df["egfr"] < 75.0) | (df["uacr"] >= 25.0) | (df["delta_egfr"].fillna(0.0) <= -4.0)))
+    )
+    df["target_cardiorrenal"] = is_ren.astype(int)
 
     return df[ALL_COLUMNS]
 
