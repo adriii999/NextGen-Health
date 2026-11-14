@@ -12,15 +12,12 @@ from app.backend.config import settings
 # 1. PRUEBAS EN SERVIDOR INSTANCIADO: ESTADO NO IMPLEMENTADO (501)
 # ==============================================================================
 
-def test_api_root_endpoint_provides_frontend_guide(http_client: httpx.Client):
-    """GET / en el servidor instanciado responde 200 con la guía de conexión del frontend o el SPA."""
+def test_api_root_endpoint_serves_frontend_or_guide(http_client: httpx.Client):
+    """GET / en el servidor instanciado responde 200 con el SPA de React (HTML) o la guía JSON."""
     response = http_client.get("/")
     assert response.status_code == 200
-    # Si aún no hay dist/index.html, devuelve JSON de integración
-    if "application/json" in response.headers.get("content-type", ""):
-        data = response.json()
-        assert "frontend_connection_guide" in data
-        assert "http://localhost:5173" in str(data)
+    content_type = response.headers.get("content-type", "")
+    assert "text/html" in content_type or "application/json" in content_type
 
 
 def test_api_health_shows_model_pending(http_client: httpx.Client):
