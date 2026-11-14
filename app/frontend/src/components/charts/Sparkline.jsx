@@ -1,5 +1,5 @@
 // src/components/charts/Sparkline.jsx
-import React from 'react';
+import React, { useId } from 'react';
 
 export const Sparkline = ({
   points = [],
@@ -10,6 +10,8 @@ export const Sparkline = ({
   isFavorable = false,
   ariaLabel = 'Tendencia temporal',
 }) => {
+  const gradientId = useId();
+
   // Asegurar al menos 2 puntos válidos
   const validPoints = points.length >= 2 ? points : [points[0] || 75, points[0] || 75];
   const min = Math.min(...validPoints);
@@ -31,7 +33,6 @@ export const Sparkline = ({
   // Generar curva suavizada o línea limpia con stroke 2px
   let pathD = '';
   if (coords.length === 2) {
-    // Si son dos puntos, trazar línea limpia directa
     pathD = `M ${coords[0].x} ${coords[0].y} L ${coords[1].x} ${coords[1].y}`;
   } else {
     pathD = coords.reduce((acc, pt, idx, arr) => {
@@ -42,20 +43,26 @@ export const Sparkline = ({
     }, '');
   }
 
+  const firstPt = coords[0];
   const lastPt = coords[coords.length - 1];
 
-  // Paleta clínica sobria
+  // Determinar si hay cruce crítico de umbral (deterioro progresivo)
+  const hasThresholdDrop = (isSilent || isCritical) && coords.length >= 2 && validPoints[0] > validPoints[validPoints.length - 1];
+
   let strokeColor = '#94A3B8'; // Slate 400
   let dotColor = '#64748B';
 
-  if (isSilent) {
-    strokeColor = '#C2410C'; // Alerta silente naranja
+  if (hasThresholdDrop) {
+    strokeColor = `url(#${gradientId})`;
+    dotColor = isCritical ? '#E11D48' : '#C2410C';
+  } else if (isSilent) {
+    strokeColor = '#C2410C';
     dotColor = '#C2410C';
   } else if (isCritical) {
-    strokeColor = '#E11D48'; // Rose 600
+    strokeColor = '#E11D48';
     dotColor = '#E11D48';
   } else if (isFavorable) {
-    strokeColor = '#059669'; // Emerald 600
+    strokeColor = '#059669';
     dotColor = '#059669';
   }
 
@@ -68,7 +75,16 @@ export const Sparkline = ({
       aria-label={ariaLabel}
     >
       <title>{ariaLabel}</title>
-      {/* Línea de trayectoria suavizada con stroke de 2px */}
+      <defs>
+        {/* Gradiente contextual si hay cruce de umbral: verde seguro -> alerta ámbar -> rojo clínico */}
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#10B981" />
+          <stop offset="50%" stopColor="#F59E0B" />
+          <stop offset="100%" stopColor={isCritical ? '#E11D48' : '#C2410C'} />
+        </linearGradient>
+      </defs>
+
+      {/* Trazo animado a 400ms con cubic-bezier out-expo */}
       <path
         d={pathD}
         fill="none"
@@ -76,7 +92,20 @@ export const Sparkline = ({
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
+        className="animate-sparkline"
       />
+
+      {/* Punto inicial tenue si hay cruce de umbral */}
+      {hasThresholdDrop && (
+        <circle
+          cx={firstPt.x}
+          cy={firstPt.y}
+          r={2}
+          fill="#10B981"
+          opacity="0.8"
+        />
+      )}
+
       {/* Punto final resaltado con borde blanco para alto contraste */}
       <circle
         cx={lastPt.x}

@@ -7,6 +7,7 @@ import { PriorityPatientsSection } from '../components/folderView/PriorityPatien
 import { PatientTable } from '../components/folderView/PatientTable';
 import { PatientDrawer } from '../components/drawer/PatientDrawer';
 import { PatientCarePlanModal } from '../components/patientCare/PatientCarePlanModal';
+import { PatientActionView } from '../components/patientAction/PatientActionView';
 import { AnalyzeFolderButton } from '../components/common/AnalyzeFolderButton';
 import { analiticasService } from '../services/analiticasService';
 import { MOCK_PATIENTS } from '../mock/patientsData';
@@ -15,8 +16,34 @@ export const DashboardPage = () => {
   const [patients, setPatients] = useState(MOCK_PATIENTS);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [carePlanPatient, setCarePlanPatient] = useState(null);
+  const [intervenePatient, setIntervenePatient] = useState(null);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null);
+
+  // Guardar Plan de Intervención Clínica y Notificar Cita
+  const handleSaveIntervention = (patientId, planData) => {
+    setPatients((prev) =>
+      prev.map((p) => {
+        if (p.id === patientId) {
+          return {
+            ...p,
+            intervenido: true,
+            intervencion: planData,
+            estado_intervencion: `Intervenido / ${planData.triageLabel}`,
+          };
+        }
+        return p;
+      })
+    );
+
+    const targetPatient = patients.find((p) => p.id === patientId);
+    const pName = targetPatient?.nombre || 'Paciente';
+
+    setNotification({
+      type: 'success',
+      text: `Plan de intervención clínica guardado: Cita reasignada (${planData.triageLabel}) y conciliación farmacológica completada para ${pName}.`,
+    });
+  };
 
   // Análisis en 1 Clic con simulación de progreso
   const handleAnalyzeFolder = async () => {
@@ -137,6 +164,7 @@ export const DashboardPage = () => {
         patients={patients}
         onSelectPatient={(p) => setSelectedPatient(p)}
         onOpenCarePlan={(p) => setCarePlanPatient(p)}
+        onIntervenePatient={(p) => setIntervenePatient(p)}
       />
 
       {/* Tabla de Decisiones Clínicas (Sin scroll horizontal, etiquetas directas) */}
@@ -152,6 +180,7 @@ export const DashboardPage = () => {
         <PatientTable
           patients={patients}
           onSelectPatient={(p) => setSelectedPatient(p)}
+          onIntervenePatient={(p) => setIntervenePatient(p)}
         />
       )}
 
@@ -160,8 +189,24 @@ export const DashboardPage = () => {
         <PatientDrawer
           patient={selectedPatient}
           onClose={() => setSelectedPatient(null)}
+          onIntervenePatient={(p) => {
+            setSelectedPatient(null);
+            setIntervenePatient(p);
+          }}
         />
       )}
+
+      {/* Vista y Flujo de Intervención Médica Rápida */}
+      <PatientActionView
+        isOpen={!!intervenePatient}
+        onClose={() => setIntervenePatient(null)}
+        patient={intervenePatient}
+        onSavePlan={handleSaveIntervention}
+        onOpenCarePlan={(p) => {
+          setIntervenePatient(null);
+          setCarePlanPatient(p);
+        }}
+      />
 
       {/* Modal de Hoja de Cuidados para el Paciente */}
       <PatientCarePlanModal

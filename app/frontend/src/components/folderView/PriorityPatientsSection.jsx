@@ -1,8 +1,26 @@
 // src/components/folderView/PriorityPatientsSection.jsx
 import React from 'react';
-import { AlertOctagon, ArrowRight, Pill, Calendar, Heart, Printer, ShieldAlert, AlertTriangle, FileText, CheckCircle2 } from 'lucide-react';
+import {
+  AlertOctagon,
+  ArrowRight,
+  Pill,
+  Calendar,
+  Heart,
+  Printer,
+  ShieldAlert,
+  AlertTriangle,
+  FileText,
+  CheckCircle2,
+  Clock,
+  Sparkles
+} from 'lucide-react';
 
-export const PriorityPatientsSection = ({ patients = [], onSelectPatient, onOpenCarePlan }) => {
+export const PriorityPatientsSection = ({
+  patients = [],
+  onSelectPatient,
+  onOpenCarePlan,
+  onIntervenePatient,
+}) => {
   // Filtrar exclusivamente los pacientes con riesgo oculto silencioso
   const priorityPatients = patients.filter((p) => p.categoria === 'OCULTO');
 
@@ -11,7 +29,7 @@ export const PriorityPatientsSection = ({ patients = [], onSelectPatient, onOpen
   return (
     <div className="space-y-4">
       {/* Cabecera de la Sección: Responder en 5 segundos a "¿a quién miro primero y por qué?" */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs animate-stagger-fade">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-rose-50 border border-rose-100 text-rose-700 flex items-center justify-center shrink-0">
             <AlertOctagon className="w-4 h-4 text-rose-600" />
@@ -31,15 +49,18 @@ export const PriorityPatientsSection = ({ patients = [], onSelectPatient, onOpen
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 self-start sm:self-auto text-xs font-medium text-slate-600 bg-slate-50 px-3 py-1 rounded-md border border-slate-200">
-          <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
+        <div className="flex items-center gap-2 self-start sm:self-auto text-xs font-medium text-slate-700 bg-slate-50 px-3 py-1 rounded-md border border-slate-200">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-20" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600" />
+          </span>
           <span>Prioridad 1 en Atención Primaria</span>
         </div>
       </div>
 
-      {/* Cuadrícula de Tarjetas Hero de Alta Gama */}
+      {/* Cuadrícula de Tarjetas Hero de Alta Gama con Microinteracciones */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {priorityPatients.map((patient) => {
+        {priorityPatients.map((patient, idx) => {
           const egfrAct = patient.valores_clave?.egfr?.actual || 68;
           const egfrPrev = patient.valores_clave?.egfr?.previo || 86;
           const deltaEgfr = patient.valores_clave?.egfr?.delta || -18;
@@ -49,19 +70,22 @@ export const PriorityPatientsSection = ({ patients = [], onSelectPatient, onOpen
           const creatPrev = patient.valores_clave?.creatinina?.previo || 0.92;
 
           const uacrAct = patient.valores_clave?.uacr?.actual || 35;
-          const uacrPrev = patient.valores_clave?.uacr?.previo || 18;
           const deltaUacr = patient.valores_clave?.uacr?.delta || 17;
 
-          // Titulares clínicos de impacto
           const isManuel = patient.id === 'PAC-02-SILENTE';
           const headline = isManuel
             ? `Creatinina en rango normal (${creatAct} mg/dL), pero pérdida del ${pctEgfr}% de filtrado en 12 meses`
             : `Creatinina en rango normal (${creatAct} mg/dL), pero microalbuminuria disparada (+${deltaUacr} mg/g)`;
 
+          const isIntervenido = !!patient.intervenido;
+
           return (
             <div
               key={patient.id}
-              className="bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between overflow-hidden"
+              style={{ animationDelay: `${idx * 40}ms` }}
+              className={`bg-white rounded-xl border shadow-sm hover:shadow-md hover:scale-[1.008] transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col justify-between overflow-hidden animate-stagger-fade ${
+                isIntervenido ? 'border-emerald-300 ring-1 ring-emerald-500/20' : 'border-slate-200/80'
+              }`}
             >
               <div className="p-5 space-y-4">
                 
@@ -76,10 +100,20 @@ export const PriorityPatientsSection = ({ patients = [], onSelectPatient, onOpen
                     </span>
                   </div>
 
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
-                    <span>Mirar hoy</span>
-                  </span>
+                  {isIntervenido ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Intervenido • {patient.intervencion?.triageLabel || 'Cita Reasignada'}</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-20" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600" />
+                      </span>
+                      <span>Mirar hoy</span>
+                    </span>
+                  )}
                 </div>
 
                 <div className="text-xs text-slate-500 -mt-2">
@@ -138,7 +172,7 @@ export const PriorityPatientsSection = ({ patients = [], onSelectPatient, onOpen
                         strokeDasharray="3 3"
                         strokeOpacity="0.5"
                       />
-                      {/* Watermark discreto en esquina superior derecha (nunca colisiona con datos) */}
+                      {/* Watermark discreto en esquina superior derecha */}
                       <text
                         x="450"
                         y="22"
@@ -174,14 +208,13 @@ export const PriorityPatientsSection = ({ patients = [], onSelectPatient, onOpen
 
                       {/* Punto T (Hoy): eGFR Actual con caída */}
                       <circle cx="360" cy="78" r="5.5" fill="#C2410C" stroke="#FFFFFF" strokeWidth="2" />
-                      {/* Badge flotante tipo "pill" en el punto final (evita cualquier colisión) */}
+                      {/* Badge flotante tipo "pill" en el punto final */}
                       <g transform="translate(320, 92)">
                         <rect width="135" height="18" rx="4" fill="#FFFFFF" stroke="#F4D0BD" strokeWidth="1" />
                         <text x="67" y="13" textAnchor="middle" fontSize="9" fontWeight="800" className="font-mono" fill="#C2410C">
                           Hoy: {egfrAct} mL/min (-{pctEgfr}%)
                         </text>
                       </g>
-
 
                       {/* --- PLANO INFERIOR: CREATININA SÉRICA (Plana, en rango normal) --- */}
                       
@@ -210,7 +243,6 @@ export const PriorityPatientsSection = ({ patients = [], onSelectPatient, onOpen
                           Cr {creatAct} ("Normal")
                         </text>
                       </g>
-
 
                       {/* --- EJE TEMPORAL INFERIOR --- */}
                       <line x1="30" y1="152" x2="460" y2="152" stroke="#E2E8F0" strokeWidth="1" />
@@ -259,25 +291,40 @@ export const PriorityPatientsSection = ({ patients = [], onSelectPatient, onOpen
 
               </div>
 
-              {/* 5. Botones de Acción de Alta Gama */}
-              <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-200/80 flex items-center justify-end gap-2.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => onOpenCarePlan?.(patient)}
-                  className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium px-3.5 py-2 rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-                  title="Generar e imprimir hoja de cuidados para entregar al paciente"
-                >
-                  <Printer className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Hoja para el paciente</span>
-                </button>
+              {/* 5. Botones de Acción: "Priorizar e Intervenir" Claro y Destacado */}
+              <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpenCarePlan?.(patient)}
+                    className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    title="Generar e imprimir hoja de cuidados para entregar al paciente"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Hoja para el paciente</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onSelectPatient?.(patient)}
+                    className="text-slate-600 hover:text-slate-900 text-xs font-medium px-2 py-1.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    Ver análisis (2ª opinión)
+                  </button>
+                </div>
 
                 <button
                   type="button"
-                  onClick={() => onSelectPatient?.(patient)}
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-medium px-4 py-2 rounded-lg text-xs shadow-sm flex items-center gap-2 cursor-pointer transition-colors"
+                  onClick={() => onIntervenePatient?.(patient)}
+                  className={`font-semibold px-4 py-2 rounded-lg text-xs shadow-sm flex items-center gap-2 cursor-pointer transition-all ${
+                    isIntervenido
+                      ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                      : 'bg-slate-900 hover:bg-slate-800 text-white'
+                  }`}
                 >
-                  <span>Priorizar en consulta / Ver decisión</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{isIntervenido ? 'Plan Intervenido (Modificar)' : 'Priorizar e Intervenir'}</span>
+                  <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
                 </button>
               </div>
 

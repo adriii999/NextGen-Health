@@ -1,10 +1,10 @@
 // src/components/folderView/PatientTable.jsx
 import React, { useState } from 'react';
-import { Search, Eye, ArrowRight, Printer, Pill, Calendar, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Search, Eye, ArrowRight, Printer, Pill, Calendar, AlertTriangle, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { Sparkline } from '../charts/Sparkline';
 import { PatientCarePlanModal } from '../patientCare/PatientCarePlanModal';
 
-export const PatientTable = ({ patients = [], onSelectPatient }) => {
+export const PatientTable = ({ patients = [], onSelectPatient, onIntervenePatient }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('TODOS');
   const [expandedPatientId, setExpandedPatientId] = useState(null);
@@ -17,7 +17,7 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
         return {
           id: 'MIRAR_HOY',
           label: 'Mirar hoy',
-          dotColor: 'bg-rose-600 animate-pulse',
+          dotColor: 'bg-rose-600',
           badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
           priority: 1,
           isSilent: true,
@@ -26,7 +26,7 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
         return {
           id: 'MIRAR_HOY',
           label: 'Mirar hoy',
-          dotColor: 'bg-rose-600 animate-pulse',
+          dotColor: 'bg-rose-600',
           badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
           priority: 2,
           isSilent: false,
@@ -73,6 +73,9 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
 
   // Ordenación por prioridad de decisión
   const sortedPatients = [...patients].sort((a, b) => {
+    // Si ya está intervenido, baja su prioridad relativa
+    if (a.intervenido && !b.intervenido) return 1;
+    if (!a.intervenido && b.intervenido) return -1;
     const pA = getDecisionStatus(a.categoria).priority;
     const pB = getDecisionStatus(b.categoria).priority;
     return pA - pB;
@@ -165,8 +168,8 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
                 <th className="py-3 px-4 w-[24%]">Paciente</th>
                 <th className="py-3 px-3 w-[16%]">Decisión</th>
                 <th className="py-3 px-3 w-[26%]">Tendencia eGFR (12m)</th>
-                <th className="py-3 px-3 w-[22%]">Motivo de Decisión</th>
-                <th className="py-3 px-4 w-[12%] text-right">Acción</th>
+                <th className="py-3 px-3 w-[20%]">Motivo de Decisión</th>
+                <th className="py-3 px-4 w-[14%] text-right">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
@@ -177,10 +180,11 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
                   </td>
                 </tr>
               ) : (
-                filteredPatients.map((p) => {
+                filteredPatients.map((p, idx) => {
                   const status = getDecisionStatus(p.categoria);
                   const isExpanded = expandedPatientId === p.id;
                   const isSilent = p.categoria === 'OCULTO';
+                  const isIntervenido = !!p.intervenido;
 
                   const egfrAct = p.valores_clave?.egfr?.actual;
                   const egfrPrev = p.valores_clave?.egfr?.previo;
@@ -197,9 +201,12 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
                         onClick={() => {
                           setExpandedPatientId(prev => (prev === p.id ? null : p.id));
                         }}
-                        className={`cursor-pointer transition-colors ${
+                        style={{ animationDelay: `${idx * 30}ms` }}
+                        className={`cursor-pointer transition-colors animate-stagger-fade ${
                           isExpanded
                             ? 'bg-slate-100/70'
+                            : isIntervenido
+                            ? 'bg-emerald-50/20 hover:bg-emerald-50/40'
                             : isSilent
                             ? 'bg-rose-50/20 hover:bg-rose-50/40'
                             : 'hover:bg-slate-50'
@@ -217,10 +224,24 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
 
                         {/* 2. Estado / Decisión */}
                         <td className="py-3 px-3">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${status.badgeClass}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
-                            <span>{status.label}</span>
-                          </span>
+                          {isIntervenido ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold bg-emerald-50 text-emerald-800 border-emerald-300">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Cita Reasignada</span>
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${status.badgeClass}`}>
+                              {status.id === 'MIRAR_HOY' ? (
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-20" />
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600" />
+                                </span>
+                              ) : (
+                                <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
+                              )}
+                              <span>{status.label}</span>
+                            </span>
+                          )}
                         </td>
 
                         {/* 3. Tendencia eGFR con Puntos Reales e Inicial -> Actual Monospaciado */}
@@ -255,19 +276,52 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
                           {getShortReason(p)}
                         </td>
 
-                        {/* 5. Acción Directa: Botón Ghost Elegante */}
+                        {/* 5. Acción Directa */}
                         <td className="py-3 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSelectPatient(p);
-                            }}
-                            className="bg-transparent hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs hover:text-slate-900"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Ver decisión</span>
-                          </button>
+                          {isSilent || p.categoria === 'ALTO' ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onIntervenePatient?.(p);
+                                }}
+                                className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all inline-flex items-center gap-1 cursor-pointer shadow-2xs ${
+                                  isIntervenido
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
+                                    : 'bg-slate-900 hover:bg-slate-800 text-white'
+                                }`}
+                                title="Reprogramar cita y conciliar pauta preventiva"
+                              >
+                                <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>{isIntervenido ? 'Plan' : 'Intervenir'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSelectPatient(p);
+                                }}
+                                className="bg-transparent hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 p-1.5 rounded-md text-xs transition-all inline-flex items-center cursor-pointer shadow-2xs"
+                                title="Ver segunda opinión completa"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-slate-500" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectPatient(p);
+                              }}
+                              className="bg-transparent hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs hover:text-slate-900"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Ver decisión</span>
+                            </button>
+                          )}
                         </td>
                       </tr>
 
@@ -319,11 +373,14 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
                                 </div>
                               </div>
 
-                              {/* Botones de Acción */}
+                              {/* Botones de Acción Inline */}
                               <div className="flex items-center justify-end gap-2.5 pt-1">
                                 <button
                                   type="button"
-                                  onClick={() => setCarePlanPatient(p)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCarePlanPatient(p);
+                                  }}
                                   className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                                 >
                                   <Printer className="w-3.5 h-3.5 text-slate-500" />
@@ -332,11 +389,14 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
 
                                 <button
                                   type="button"
-                                  onClick={() => onSelectPatient(p)}
-                                  className="bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1 cursor-pointer shadow-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onIntervenePatient?.(p);
+                                  }}
+                                  className="bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
                                 >
-                                  <span>Ver Segunda Opinión Completa</span>
-                                  <ArrowRight className="w-3.5 h-3.5" />
+                                  <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>Priorizar e Intervenir</span>
                                 </button>
                               </div>
 

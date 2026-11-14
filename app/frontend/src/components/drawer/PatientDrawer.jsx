@@ -10,7 +10,7 @@ import { ProblemMatrixChart } from '../charts/ProblemMatrixChart';
 import { AlgorithmExplainer } from './AlgorithmExplainer';
 import { PatientCarePlanModal } from '../patientCare/PatientCarePlanModal';
 
-export const PatientDrawer = ({ patient, onClose }) => {
+export const PatientDrawer = ({ patient, onClose, onIntervenePatient }) => {
   const [activeAnalysisTab, setActiveAnalysisTab] = useState('kdigo'); // 'kdigo', 'projection', 'shap', 'problems'
   const [isCareModalOpen, setIsCareModalOpen] = useState(false);
   const drawerRef = useRef(null);
@@ -104,14 +104,25 @@ export const PatientDrawer = ({ patient, onClose }) => {
               </p>
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-[4px] text-[#5A6573] hover:text-[#0E1621] hover:bg-[#E3E6EB] transition-colors cursor-pointer"
-              aria-label="Cerrar panel de detalle (Esc)"
-              title="Cerrar panel (Esc)"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onIntervenePatient?.(patient)}
+                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Priorizar e Intervenir</span>
+              </button>
+
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-[4px] text-[#5A6573] hover:text-[#0E1621] hover:bg-[#E3E6EB] transition-colors cursor-pointer"
+                aria-label="Cerrar panel de detalle (Esc)"
+                title="Cerrar panel (Esc)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Cuerpo con Scroll y Secciones Clínicas */}
@@ -386,10 +397,17 @@ export const PatientDrawer = ({ patient, onClose }) => {
               </button>
               <button
                 onClick={() => setIsCareModalOpen(true)}
-                className="px-3.5 py-1.5 rounded-[6px] bg-[#1D3B6B] hover:bg-[#162E54] text-white text-[12px] font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="px-3.5 py-1.5 rounded-[6px] bg-white border border-[#CBD0D8] text-[#0E1621] hover:bg-[#F6F7F9] text-[12px] font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
-                <Printer className="w-3.5 h-3.5" />
+                <Printer className="w-3.5 h-3.5 text-[#5A6573]" />
                 <span>Hoja de Cuidados</span>
+              </button>
+              <button
+                onClick={() => onIntervenePatient?.(patient)}
+                className="px-3.5 py-1.5 rounded-[6px] bg-slate-900 hover:bg-slate-800 text-white text-[12px] font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Priorizar e Intervenir</span>
               </button>
             </div>
           </div>
