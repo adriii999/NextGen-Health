@@ -1,269 +1,104 @@
-// src/pages/DashboardPage.jsx
-import React, { useState, useEffect } from 'react';
-import {
-  Activity,
-  FolderOpen,
-  Sparkles,
-  Users,
-  AlertTriangle,
-  EyeOff,
-  HeartPulse,
-  RefreshCw,
-  Server,
-  CheckCircle2,
-  AlertCircle,
-  FileSpreadsheet,
-} from 'lucide-react';
-import { Button } from '../components/common/Button';
-import { Card } from '../components/common/Card';
-import { Badge } from '../components/common/Badge';
-import { AnaliticasTable } from '../components/folderView/AnaliticasTable';
-import { PatientDetailModal } from '../components/folderView/PatientDetailModal';
-import { analiticasService } from '../services/analiticasService';
-import { MOCK_PATIENTS, MOCK_KPIS } from '../mock/patientsData';
+import { useState } from 'react';
+import { FolderOpen, RefreshCw, Search, FileText, ArrowLeft, Activity, Check, AlertCircle } from 'lucide-react';
+import { analiticasService, analysisError } from '../services/analiticasService';
+import { PatientResults } from '../components/folderView/PatientResults';
+import { DEMO_FILES, DEMO_PATIENTS } from '../mock/frontendDemoData';
 
 export const DashboardPage = () => {
-  const [patients, setPatients] = useState(MOCK_PATIENTS);
-  const [selectedPatient, setSelectedPatient] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [backendStatus, setBackendStatus] = useState({ online: false, modelo_cargado: false });
-  const [statusMessage, setStatusMessage] = useState(null);
+  const demoMode = new URLSearchParams(window.location.search).get('demo') === '1';
+  const [files, setFiles] = useState(demoMode ? DEMO_FILES : null);
+  const [patients, setPatients] = useState(demoMode ? DEMO_PATIENTS : null);
+  const [selected, setSelected] = useState(demoMode ? DEMO_PATIENTS[0].id : null);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const [health, setHealth] = useState(null);
+  const [search, setSearch] = useState('');
+  const [priority, setPriority] = useState('');
 
-  // Comprobar estado de la API al montar
-  useEffect(() => {
-    checkBackend();
-  }, []);
-
-  const checkBackend = async () => {
-    const status = await analiticasService.checkHealth();
-    setBackendStatus(status);
-  };
-
-  // Botón Principal en 1 Clic: Analizar Carpeta
-  const handleAnalyzeFolder = async () => {
-    setLoading(true);
-    setStatusMessage(null);
-    try {
-      const res = await analiticasService.analizarCarpeta();
-      if (res.success && res.pacientes?.length > 0) {
-        setPatients(res.pacientes);
-        if (res.isDemo) {
-          setStatusMessage({
-            type: 'info',
-            text: res.motivoDemo || 'Ejecutando con motor de evaluación clínica integrado.',
-          });
-        } else {
-          setStatusMessage({
-            type: 'success',
-            text: `Análisis completado: ${res.pacientes.length} analíticas evaluadas en tiempo real.`,
-          });
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      setStatusMessage({
-        type: 'error',
-        text: 'Error en la conexión con el servicio de análisis.',
-      });
-    } finally {
-      setLoading(false);
+  async function loadFiles() {
+    setBusy('files'); setError('');
+    setPatients(null); setSelected(null); setFiles(null);
+    if (demoMode) {
+      setFiles(DEMO_FILES);
+      setHealth({ online: false, modelo_cargado: false });
+      setBusy('');
+      return;
     }
-  };
+    try {
+      const [response, status] = await Promise.all([analiticasService.getArchivosAnaliticas(), analiticasService.checkHealth()]);
+      setFiles(response.archivos); setHealth(status);
+    } catch (err) { setError(analysisError(err)); }
+    finally { setBusy(''); }
+  }
 
-  // Métricas dinámicas calculadas sobre el dataset actual
-  const total = patients.length;
-  const ocultos = patients.filter((p) => p.categoria === 'OCULTO').length;
-  const altos = patients.filter((p) => p.categoria === 'ALTO').length;
-  const moderados = patients.filter((p) => p.categoria === 'MEDIO').length;
-  const controlados = patients.filter((p) => p.categoria === 'CONTROLADO').length;
+  async function analyze() {
+    setBusy('analysis'); setError(''); setPatients(null); setSelected(null);
+    if (demoMode) {
+      setPatients(DEMO_PATIENTS);
+      setBusy('');
+      return;
+    }
+    try {
+      const response = await analiticasService.analizarCarpeta();
+      setPatients(response.pacientes);
+    } catch (err) { setError(analysisError(err)); }
+    finally { setBusy(''); }
+  }
+
+  const filtered = (patients || []).filter((p) =>
+    `${p.nombre} ${p.archivo}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()) &&
+    (!priority || p.nivel_prioridad === priority));
+  const patient = patients?.find((p) => p.id === selected);
 
   return (
-    <div className="space-y-6">
-      
-      {/* Barra de Estado del Backend y Notificaciones */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200">
-        <div className="flex items-center gap-2.5">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              backendStatus.online ? 'bg-emerald-500 ring-4 ring-emerald-100' : 'bg-amber-400 ring-4 ring-amber-100'
-            }`}
-          />
-          <span className="text-xs font-semibold text-slate-700">
-            Backend FastAPI:{' '}
-            <span className={backendStatus.online ? 'text-emerald-700 font-bold' : 'text-amber-700'}>
-              {backendStatus.online ? 'Conectado (Puerto 8000)' : 'Modo Autónomo Local'}
-            </span>
-          </span>
-          {backendStatus.online && (
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-              Modelo ML: {backendStatus.modelo_cargado ? 'Activo (XGBoost)' : 'Pendiente Artefacto'}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            icon={RefreshCw}
-            onClick={checkBackend}
-          >
-            Sincronizar
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            icon={Sparkles}
-            loading={loading}
-            onClick={handleAnalyzeFolder}
-          >
-            Analizar Carpeta en 1 Clic
-          </Button>
-        </div>
+    <div className="workspace">
+      <div className="page-heading">
+        <div><p className="eyebrow">Consulta · Revisión individual</p><h1>Revisar un paciente</h1><p>Consulta sus riesgos, entiende el resultado y revisa los datos de la analítica.</p></div>
+        <details className="review-tools">
+          <summary>{demoMode ? 'Opciones de prueba' : 'Opciones de analíticas'}</summary>
+          <div className="review-tools-content">
+          <p>{demoMode ? 'Vuelve al inicio del flujo para probar la carga y el análisis con datos ficticios.' : 'Carga los archivos del servicio para preparar un nuevo lote de resultados.'}</p>
+          <button className="button secondary" onClick={(event) => { event.currentTarget.closest('details').open = false; loadFiles(); }} disabled={!!busy}>
+          {files ? <RefreshCw size={18} aria-hidden="true" /> : <FolderOpen size={18} aria-hidden="true" />}
+          {busy === 'files' ? 'Cargando analíticas…' : files ? 'Actualizar archivos' : 'Cargar analíticas'}
+        </button>
+          </div>
+        </details>
       </div>
 
-      {statusMessage && (
-        <div
-          className={`p-3 rounded-lg text-xs flex items-center gap-2 border ${
-            statusMessage.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              : statusMessage.type === 'info'
-              ? 'bg-blue-50 border-blue-200 text-blue-800'
-              : 'bg-rose-50 border-rose-200 text-rose-800'
-          }`}
-        >
-          {statusMessage.type === 'success' ? (
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-          ) : (
-            <AlertCircle className="w-4 h-4 shrink-0 text-blue-600" />
-          )}
-          <span>{statusMessage.text}</span>
-        </div>
+      {demoMode && <div className="demo-banner" role="note"><strong>Modo demo, datos completamente ficticios.</strong><span>No son pacientes ni predicciones reales. No se consulta ni se envía información al backend.</span></div>}
+
+      {!patients && <ol className="workflow" aria-label="Proceso de revisión">
+        <li className={files ? 'complete' : 'current'}><span>{files ? <Check size={16} /> : '1'}</span><div><strong>Cargar analíticas</strong><small>Archivos disponibles</small></div></li>
+        <li className={patients ? 'complete' : files?.length ? 'current' : ''}><span>{patients ? <Check size={16} /> : '2'}</span><div><strong>Analizar el lote</strong><small>Evaluación del modelo</small></div></li>
+        <li className={patients ? 'current' : ''}><span>3</span><div><strong>Revisar un paciente</strong><small>Resultados y explicación</small></div></li>
+      </ol>}
+
+      {error && <div className="error-notice" role="alert"><AlertCircle size={20} aria-hidden="true" /><div><strong>No se ha completado la operación</strong><p>{error}</p></div></div>}
+      <div role="status" aria-live="polite" className="sr-only">{busy === 'analysis' ? 'Analizando las analíticas. Espera a que termine el proceso.' : patients ? `${patients.length} resultados disponibles.` : ''}</div>
+
+      {!patients && (
+        <section className="surface intake" aria-busy={!!busy}>
+          <div className="section-heading"><div><h2>Analíticas disponibles</h2><p>Archivos JSON y CSV de la carpeta del servicio.</p></div>{files && <span className="count-label">{files.length} archivos</span>}</div>
+          {files === null ? <div className="empty-state"><FolderOpen size={40} strokeWidth={1.4} aria-hidden="true" /><h3>{busy ? 'Cargando archivos…' : 'Empieza por cargar las analíticas'}</h3><p>Consulta los archivos disponibles antes de enviarlos al modelo.</p></div>
+            : files.length === 0 ? <div className="empty-state"><h3>No hay analíticas disponibles</h3><p>Añade archivos a data/analiticas/ en el servidor y actualiza la lista.</p></div>
+            : <><ul className="file-list">{files.map((file) => <li key={file.archivo}><FileText size={22} aria-hidden="true" /><div><strong>{file.archivo}</strong><small>Modificado: {file.fecha_modificacion || 'No disponible'} · {Number.isFinite(file.tamano_bytes) ? `${(file.tamano_bytes / 1024).toLocaleString('es-ES', { maximumFractionDigits: 1 })} KB` : 'Tamaño no disponible'}</small></div><span className="file-context">{file.tiene_progresion ? 'Con evolución' : 'Analítica aislada'}</span></li>)}</ul>
+            <div className="intake-action"><div><strong>Analiza todos los archivos disponibles</strong><p>{health?.modelo_cargado ? 'Modelo disponible. El resultado se mostrará por paciente.' : 'La disponibilidad del modelo se comprobará al analizar.'} Un CSV puede contener varios pacientes.</p></div><button className="button primary" onClick={analyze} disabled={!!busy}><Activity size={18} aria-hidden="true" />{busy === 'analysis' ? 'Analizando lote…' : 'Analizar lote'}</button></div></>}
+        </section>
       )}
 
-      {/* Fila de KPIs Rápidos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* KPI 1: Total Pacientes */}
-        <Card padding="p-4" className="hover:border-indigo-200 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Pacientes Evaluados
-            </span>
-            <Users className="w-4 h-4 text-indigo-500" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900 tabular-nums">{total}</span>
-            <span className="text-xs font-semibold text-slate-400">en cupo activo</span>
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500 flex items-center justify-between">
-            <span>Control óptimo: <strong>{controlados}</strong></span>
-            <span>Moderados: <strong>{moderados}</strong></span>
-          </div>
-        </Card>
-
-        {/* KPI 2: Riesgo Oculto Silente (Destacado Principal) */}
-        <div className="bg-rose-50/80 rounded-xl border-2 border-rose-300/80 p-4 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-rose-800 flex items-center gap-1.5">
-              <EyeOff className="w-3.5 h-3.5 text-rose-600" />
-              Riesgo Oculto Silente
-            </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-200/70 text-rose-800 animate-pulse">
-              Prioridad AP
-            </span>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-rose-700 tabular-nums">{ocultos}</span>
-            <span className="text-xs font-bold text-rose-600">
-              ({total > 0 ? Math.round((ocultos / total) * 100) : 0}% del cupo)
-            </span>
-          </div>
-          <p className="mt-2 text-[11px] text-rose-900 leading-snug font-medium">
-            Analítica normal en rango estándar, pero con deterioro renal/vascular silencioso en trayectoria.
-          </p>
-        </div>
-
-        {/* KPI 3: Alto Riesgo Evidente */}
-        <Card padding="p-4" className="hover:border-red-200 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Alto Riesgo Evidente
-            </span>
-            <AlertTriangle className="w-4 h-4 text-red-500" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900 tabular-nums">{altos}</span>
-            <span className="text-xs font-semibold text-red-600">acción farmacológica</span>
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            Dislipidemia severa y/o HTA descompensada manifiesta.
-          </div>
-        </Card>
-
-        {/* KPI 4: Ahorro Operativo en AP */}
-        <Card padding="p-4" className="hover:border-emerald-200 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Eficiencia de Cribado
-            </span>
-            <HeartPulse className="w-4 h-4 text-emerald-500" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-emerald-700 tabular-nums">1 Clic</span>
-            <span className="text-xs font-semibold text-slate-400">vs 6 min/paciente</span>
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            Ahorro estimado: <strong>~4.8 horas semanales</strong> en revisión manual de analíticas.
-          </div>
-        </Card>
-
-      </div>
-
-      {/* Banner de Contexto Clínico */}
-      <div className="bg-linear-to-r from-indigo-900 to-slate-900 text-white rounded-xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 uppercase tracking-wider">
-              Enfoque Preventivo • Reto 1 Boehringer Ingelheim
-            </span>
-          </div>
-          <h2 className="text-base sm:text-lg font-bold">
-            Detección Precoz del Deterioro Silente en Atención Primaria
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-            El sistema cruza valores aislados con su trayectoria interanual (Modo B). Pacientes como Manuel S. R.
-            tienen creatinina en rango normal (1.10 mg/dL), pero han perdido un 21% de filtrado glomerular en 12 meses.
-          </p>
-        </div>
-        <div className="shrink-0 flex items-center gap-2">
-          <Button
-            variant="success"
-            size="md"
-            icon={FileSpreadsheet}
-            onClick={() => setSelectedPatient(patients.find((p) => p.categoria === 'OCULTO') || patients[0])}
-          >
-            Ver Caso Clínico Silente
-          </Button>
-        </div>
-      </div>
-
-      {/* Tabla Principal */}
-      <AnaliticasTable
-        patients={patients}
-        onSelectPatient={(patient) => setSelectedPatient(patient)}
-      />
-
-      {/* Modal de Detalle */}
-      {selectedPatient && (
-        <PatientDetailModal
-          patient={selectedPatient}
-          onClose={() => setSelectedPatient(null)}
-        />
-      )}
-
+      {patients && <div className={`review-layout ${patient ? 'has-selection' : ''}`}>
+        <aside className="surface patient-sidebar" aria-label="Seleccionar paciente">
+          <div className="section-heading"><div><h2>Pacientes</h2><p>{patients.length} resultados del lote</p></div><button className="icon-button" onClick={() => { setPatients(null); setSelected(null); }} aria-label="Volver a los archivos"><ArrowLeft size={20} /></button></div>
+          <div className="patient-filters"><label htmlFor="patient-search">Buscar paciente o archivo</label><div className="search-field"><Search size={18} aria-hidden="true" /><input id="patient-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre o archivo" /></div><label htmlFor="priority">Prioridad de revisión</label><select id="priority" value={priority} onChange={(event) => setPriority(event.target.value)}><option value="">Todas las prioridades</option><option value="ALTA">Alta</option><option value="MEDIA">Media</option><option value="BAJA">Baja</option></select></div>
+          <ul className="patient-list">{filtered.map((p) => <li key={p.id}><button className={selected === p.id ? 'selected' : ''} aria-pressed={selected === p.id} onClick={() => setSelected(p.id)}><span className="patient-row"><strong>{p.nombre}</strong><span className={`priority priority-${p.nivel_prioridad}`}>{p.nivel_prioridad || 'Sin prioridad'}</span></span><span className="patient-meta">{p.edad !== null ? `${p.edad} años · ` : ''}{p.tiene_progresion ? 'Con evolución' : 'Sin evolución disponible'}</span><span className="patient-reason">{p.disparador_principal || 'Consulta la evaluación del modelo.'}</span></button></li>)}</ul>
+          {!filtered.length && <p className="list-empty">{patients.length ? 'No hay resultados con estos filtros.' : 'El servicio no devolvió pacientes evaluables.'}</p>}
+        </aside>
+        <section className="surface results-panel" aria-label="Resultado del paciente">
+          {patient ? <><button className="button secondary mobile-back" onClick={() => setSelected(null)}><ArrowLeft size={18} />Volver a pacientes</button><PatientResults key={patient.id} patient={patient} /></>
+            : <div className="empty-state selection-empty"><Activity size={42} strokeWidth={1.3} aria-hidden="true" /><h2>Selecciona un paciente</h2><p>Verás su valoración, los parámetros de la analítica y los factores que explican el resultado.</p><span className="quiet-label">Cada resultado pertenece a una analítica del lote.</span></div>}
+        </section>
+      </div>}
     </div>
   );
 };
-
-export default DashboardPage;
