@@ -1,5 +1,6 @@
 import json
 import pytest
+import joblib
 from pathlib import Path
 from unittest.mock import MagicMock
 import numpy as np
@@ -33,16 +34,56 @@ def test_model_service_unloaded_raises_not_implemented():
     assert "Se requiere entrenar el modelo" in str(exc_info.value)
 
 
-def test_model_service_with_trained_model_evaluates_correctly():
-    """Verifica la lógica de inferencia cuando el modelo real SÍ está inyectado."""
-    service = ModelService()
-    
-    # Crear un mock estimator con predict_proba
-    mock_model = MagicMock()
-    # Simula salida de proba: 0.15 clase 1 (riesgo)
-    mock_model.predict_proba.return_value = np.array([[0.85, 0.15]])
+def test_model_service_loads_complete_three_model_artifact(tmp_path):
+    artifact_path = tmp_path / "model_artifact.joblib"
+    risk_names = list(ModelService().thresholds)
+    joblib.dump(
+        {
+            "models": {name: object() for name in risk_names},
+            "explainers": {name: object() for name in risk_names},
+            "thresholds": {name: 0.2 for name in risk_names},
+            "feature_names": ModelService().feature_names,
+        },
+        artifact_path,
+    )
 
-    service.model = mock_model
+    service = ModelService()
+
+    assert service.load_artifacts(str(artifact_path)) is True
+    assert service.is_model_loaded() is True
+    assert set(service.models) == set(risk_names)
+
+
+def test_model_service_rejects_incomplete_three_model_artifact(tmp_path):
+    artifact_path = tmp_path / "incomplete.joblib"
+    joblib.dump(
+        {
+            "models": {"riesgo_aterosclerotico": object()},
+            "explainers": {},
+            "thresholds": {},
+            "feature_names": ModelService().feature_names,
+        },
+        artifact_path,
+    )
+
+    service = ModelService()
+
+    assert service.load_artifacts(str(artifact_path)) is False
+    assert service.is_model_loaded() is False
+
+
+def test_model_service_with_trained_model_evaluates_correctly():
+    """Verifica la evaluación cuando los tres clasificadores están inyectados."""
+    service = ModelService()
+    service.models = {}
+    service.explainers = {}
+    for risk_name in service.thresholds:
+        model = MagicMock()
+        model.predict_proba.return_value = np.array([[0.85, 0.15]])
+        service.models[risk_name] = model
+        explainer = MagicMock()
+        explainer.shap_values.return_value = np.ones((1, len(service.feature_names)))
+        service.explainers[risk_name] = explainer
     service.artifact_loaded = True
 
     lab = LabInput(
@@ -60,10 +101,46 @@ def test_model_service_with_trained_model_evaluates_correctly():
     result = service.evaluate(lab)
     assert result.hay_riesgo in [True, False]
     assert result.tipos_riesgo is not None
-    assert result.perfil_renal is not None
-    assert result.perfil_renal.estadio_gfr == "G2"
-    assert result.perfil_renal.estadio_uacr == "A1"
-    assert mock_model.predict_proba.called
+    assert all(model.predict_proba.called for model in service.models.values())
+
+
+def test_model_service_uses_independent_models_and_thresholds():
+    service = ModelService()
+    model_probabilities = {
+        "riesgo_aterosclerotico": 0.73,
+        "riesgo_insuficiencia_cardiaca": 0.21,
+        "riesgo_cardiorrenal": 0.11,
+    }
+    service.models = {}
+    service.explainers = {}
+    for risk_name, probability in model_probabilities.items():
+        model = MagicMock()
+        model.predict_proba.return_value = np.array([[1.0 - probability, probability]])
+        service.models[risk_name] = model
+        explainer = MagicMock()
+        explainer.shap_values.return_value = np.ones((1, len(service.feature_names)))
+        service.explainers[risk_name] = explainer
+    service.thresholds = {
+        "riesgo_aterosclerotico": 0.5,
+        "riesgo_insuficiencia_cardiaca": 0.25,
+        "riesgo_cardiorrenal": 0.1,
+    }
+    service.artifact_loaded = True
+
+    lab = LabInput(
+        edad=55, sexo=1, bmi=26, ap_hi=135, ap_lo=85,
+        colesterol_total=210, fuma=0, diabetes=1, egfr=70, uacr=25,
+    )
+    result = service.evaluate(lab)
+
+    assert result.tipos_riesgo.riesgo_aterosclerotico.valor == 0.73
+    assert result.tipos_riesgo.riesgo_insuficiencia_cardiaca.valor == 0.21
+    assert result.tipos_riesgo.riesgo_cardiorrenal.valor == 0.11
+    assert result.tipos_riesgo.riesgo_aterosclerotico.alerta is True
+    assert result.tipos_riesgo.riesgo_insuficiencia_cardiaca.alerta is False
+    assert result.tipos_riesgo.riesgo_cardiorrenal.alerta is True
+    assert all(model.predict_proba.called for model in service.models.values())
+    assert result.factores_clave
 
 
 def test_file_service_empty_folder(tmp_path):

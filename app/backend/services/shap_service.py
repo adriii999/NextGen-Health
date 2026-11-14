@@ -15,15 +15,19 @@ class ShapService:
         features_dict: Dict[str, Any],
         predicted_probs: Dict[str, float],
         top_k: int = 3,
+        allow_heuristic_fallback: bool = True,
     ) -> List[FactorClave]:
-        """Genera los factores clave explicativos. Si hay explainer SHAP lo usa,
-        de lo contrario utiliza el motor de atribución clínica heurística."""
+        """Genera factores SHAP; el fallback heurístico solo se permite explícitamente."""
         if self.explainer is not None:
             try:
                 return self._explain_with_shap(features_dict, predicted_probs, top_k)
             except Exception as e:
+                if not allow_heuristic_fallback:
+                    raise RuntimeError(f"No se pudo calcular la explicación SHAP: {e}") from e
                 print(f"Aviso: SHAP explainer falló ({e}), usando fallback heurístico clínico.")
 
+        if not allow_heuristic_fallback:
+            raise RuntimeError("No hay explainer SHAP cargado para el modelo.")
         return self._explain_heuristic(features_dict, predicted_probs, top_k)
 
     def _explain_with_shap(
