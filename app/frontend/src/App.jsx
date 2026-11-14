@@ -1,21 +1,16 @@
 // src/App.jsx
 import React, { useState } from 'react';
-import { Activity, Search, Command } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import { DashboardPage } from './pages/DashboardPage';
-import { SimulatorPage } from './pages/SimulatorPage';
 import { IngestPage } from './pages/IngestPage';
 
 export function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  const handleOpenSearch = () => {
-    window.dispatchEvent(new CustomEvent('open-command-menu'));
-  };
-
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0E1621] flex flex-col font-sans antialiased">
       
-      {/* Cabecera Clínica Institucional de Alta Precisión (Sobria, sin badges superfluos) */}
+      {/* Cabecera Clínica Institucional de Alta Precisión (Sobria, limpia, sin atajos complejos) */}
       <header className="sticky top-0 z-40 bg-white border-b border-[#E3E6EB] shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
         <div className="max-w-[1280px] mx-auto px-6">
           <div className="flex items-center justify-between h-14">
@@ -43,7 +38,6 @@ export function App() {
             <nav className="flex items-center h-full gap-7" role="tablist">
               {[
                 { id: 'dashboard', label: 'Dashboard de Cupo' },
-                { id: 'simulator', label: 'Simulador Clínico' },
                 { id: 'ingest', label: 'Buzón de Analíticas' },
               ].map((tab) => {
                 const isActive = activeTab === tab.id;
@@ -65,32 +59,16 @@ export function App() {
               })}
             </nav>
 
-            {/* 3. Acceso Rápido de Búsqueda y Perfil Clínico */}
-            <div className="flex items-center gap-2.5 shrink-0">
-              {/* Botón de Búsqueda Universal tipo Linear / Stripe */}
-              <button
-                onClick={handleOpenSearch}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-[5px] bg-[#F6F7F9] hover:bg-[#F0F2F5] border border-[#E3E6EB] hover:border-[#CBD0D8] text-[12px] text-[#5A6573] transition-colors cursor-pointer"
-                title="Buscar paciente o acción clínica (Ctrl+K)"
-              >
-                <Search className="w-3.5 h-3.5 text-[#8A94A3]" />
-                <span className="hidden sm:inline">Buscar paciente...</span>
-                <kbd className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-mono text-[#8A94A3] bg-white px-1.5 py-0.5 rounded border border-[#E3E6EB]">
-                  <Command className="w-2.5 h-2.5" /> K
-                </kbd>
-              </button>
-
-              {/* Perfil del Facultativo en Atención Primaria con Estado Operativo */}
-              <div className="flex items-center gap-2 pl-2 border-l border-[#E3E6EB]">
-                <div className="w-6 h-6 rounded-full bg-[#E8EEF7] border border-[#CBD0D8] text-[#1D3B6B] flex items-center justify-center font-mono text-[10px] font-bold">
-                  AP
-                </div>
-                <div className="hidden lg:flex items-center gap-1.5">
-                  <span className="text-[12px] font-medium text-[#0E1621]">
-                    Consulta Médica
-                  </span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#1F7A55]" title="Sistema operativo" />
-                </div>
+            {/* 3. Perfil del Facultativo en Atención Primaria con Estado Operativo */}
+            <div className="flex items-center gap-2 pl-2">
+              <div className="w-7 h-7 rounded-full bg-[#E8EEF7] border border-[#CBD0D8] text-[#1D3B6B] flex items-center justify-center font-mono text-[11px] font-bold">
+                AP
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[12px] font-medium text-[#0E1621]">
+                  Consulta Médica
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1F7A55]" title="Sistema operativo" />
               </div>
             </div>
 
@@ -101,7 +79,6 @@ export function App() {
       {/* Contenido Principal */}
       <main className="flex-1 max-w-[1280px] w-full mx-auto px-6 py-6">
         {activeTab === 'dashboard' && <DashboardPage />}
-        {activeTab === 'simulator' && <SimulatorPage />}
         {activeTab === 'ingest' && <IngestPage />}
       </main>
 

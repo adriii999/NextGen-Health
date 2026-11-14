@@ -1,525 +1,425 @@
 // src/components/folderView/PatientTable.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Eye, AlignJustify, List, ChevronDown, ChevronRight, ExternalLink, FileText, CheckCircle2, AlertOctagon, TrendingDown } from 'lucide-react';
-import { RiskBadge } from '../common/RiskBadge';
+import React, { useState } from 'react';
+import { Search, Eye, ArrowRight, Printer, Pill, Calendar, AlertTriangle, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { Sparkline } from '../charts/Sparkline';
+import { PatientCarePlanModal } from '../patientCare/PatientCarePlanModal';
 
-export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu }) => {
+export const PatientTable = ({ patients = [], onSelectPatient, onIntervenePatient }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('TODOS');
-  const [density, setDensity] = useState('normal'); // 'normal' (52px) o 'compact' (40px) - Carbon Design
-  const [focusedIndex, setFocusedIndex] = useState(0);
-  const [expandedPatientId, setExpandedPatientId] = useState(null); // Fila expandible inline (Carbon Design)
-  const searchInputRef = useRef(null);
-  const tableRef = useRef(null);
+  const [expandedPatientId, setExpandedPatientId] = useState(null);
+  const [carePlanPatient, setCarePlanPatient] = useState(null);
 
-  // Atajo de teclado: pulsar "/" enfoca el buscador
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === '/' && document.activeElement !== searchInputRef.current) {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Ordenación clínica estricta:
-  // 1. Riesgo oculto silencioso (protagonista del reto)
-  // 2. Alto riesgo evidente
-  // 3. Moderado
-  // 4. Control óptimo
-  const priorityMap = {
-    OCULTO: 1,
-    ALTO: 2,
-    MEDIO: 3,
-    CONTROLADO: 4,
+  // Mapeo clínico de estados sencillos: "Mirar hoy / Vigilar / Estable"
+  const getDecisionStatus = (categoria) => {
+    switch (categoria) {
+      case 'OCULTO':
+        return {
+          id: 'MIRAR_HOY',
+          label: 'Mirar hoy',
+          dotColor: 'bg-rose-600',
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
+          priority: 1,
+          isSilent: true,
+        };
+      case 'ALTO':
+        return {
+          id: 'MIRAR_HOY',
+          label: 'Mirar hoy',
+          dotColor: 'bg-rose-600',
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
+          priority: 2,
+          isSilent: false,
+        };
+      case 'MEDIO':
+        return {
+          id: 'VIGILAR',
+          label: 'Vigilar',
+          dotColor: 'bg-amber-600',
+          badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+          priority: 3,
+          isSilent: false,
+        };
+      case 'CONTROLADO':
+      default:
+        return {
+          id: 'ESTABLE',
+          label: 'Estable',
+          dotColor: 'bg-emerald-600',
+          badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+          priority: 4,
+          isSilent: false,
+        };
+    }
   };
 
+  // Motivos clínicos cortos en español llano sin jerga innecesaria
+  const getShortReason = (patient) => {
+    switch (patient.id) {
+      case 'PAC-02-SILENTE':
+        return 'Caída de filtrado (-18 mL/min) con creatinina falsamente normal';
+      case 'PAC-05-LOTE-01':
+        return 'Microalbuminuria acelerada (+22 mg/g) con HbA1c estable';
+      case 'PAC-03-EVIDENTE':
+        return 'LDL 175 mg/dL y PAS 152 mmHg descompensadas';
+      case 'PAC-04-MODO-A':
+        return 'Filtrado en límite (64 mL/min) sin historial interanual';
+      case 'PAC-01-SANO':
+        return 'Filtrado y tensión en objetivos de control óptimo';
+      default:
+        return patient.disparador_principal?.slice(0, 75) || 'Revisión clínica rutinaria';
+    }
+  };
+
+  // Ordenación por prioridad de decisión
   const sortedPatients = [...patients].sort((a, b) => {
-    const pA = priorityMap[a.categoria] || 5;
-    const pB = priorityMap[b.categoria] || 5;
+    // Si ya está intervenido, baja su prioridad relativa
+    if (a.intervenido && !b.intervenido) return 1;
+    if (!a.intervenido && b.intervenido) return -1;
+    const pA = getDecisionStatus(a.categoria).priority;
+    const pB = getDecisionStatus(b.categoria).priority;
     return pA - pB;
   });
 
   const filteredPatients = sortedPatients.filter((p) => {
     const matchesSearch =
       p.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.archivo?.toLowerCase().includes(searchTerm.toLowerCase());
+      p.id?.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (!matchesSearch) return false;
 
     if (selectedFilter === 'TODOS') return true;
-    if (selectedFilter === 'OCULTO') return p.categoria === 'OCULTO';
-    if (selectedFilter === 'ALTO') return p.categoria === 'ALTO';
-    if (selectedFilter === 'MEDIO') return p.categoria === 'MEDIO';
-    if (selectedFilter === 'CONTROLADO') return p.categoria === 'CONTROLADO';
+    const st = getDecisionStatus(p.categoria);
+    if (selectedFilter === 'MIRAR_HOY') return st.id === 'MIRAR_HOY';
+    if (selectedFilter === 'VIGILAR') return st.id === 'VIGILAR';
+    if (selectedFilter === 'ESTABLE') return st.id === 'ESTABLE';
 
     return true;
   });
 
-  // Navegación por teclado (Linear + Carbon pattern: flechas arriba/abajo + Enter + ArrowRight/Left para expandir)
-  const handleTableKeyDown = (e) => {
-    if (filteredPatients.length === 0) return;
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setFocusedIndex((prev) => (prev < filteredPatients.length - 1 ? prev + 1 : prev));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setFocusedIndex((prev) => (prev > 0 ? prev - 1 : 0));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const current = filteredPatients[focusedIndex];
-      if (current) {
-        setExpandedPatientId(prev => prev === current.id ? null : current.id);
-        onSelectPatient(current);
-      }
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      const current = filteredPatients[focusedIndex];
-      if (current) setExpandedPatientId(current.id);
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      setExpandedPatientId(null);
-    }
+  const counts = {
+    total: patients.length,
+    mirarHoy: patients.filter((p) => getDecisionStatus(p.categoria).id === 'MIRAR_HOY').length,
+    vigilar: patients.filter((p) => getDecisionStatus(p.categoria).id === 'VIGILAR').length,
+    estable: patients.filter((p) => getDecisionStatus(p.categoria).id === 'ESTABLE').length,
   };
-
-  const handleRowClick = (patient, idx) => {
-    setFocusedIndex(idx);
-    setExpandedPatientId(prev => (prev === patient.id ? null : patient.id));
-    onSelectPatient(patient);
-  };
-
-  const handleActionClick = (e, patient, idx) => {
-    e.stopPropagation();
-    setFocusedIndex(idx);
-    setExpandedPatientId(patient.id);
-    onSelectPatient(patient);
-  };
-
-  const toggleExpandOnly = (e, patientId) => {
-    e.stopPropagation();
-    setExpandedPatientId(prev => (prev === patientId ? null : patientId));
-  };
-
-  const isCompact = density === 'compact';
 
   return (
-    <div
-      ref={tableRef}
-      onKeyDown={handleTableKeyDown}
-      tabIndex={0}
-      className="bg-white rounded-[6px] border border-[#E3E6EB] overflow-hidden focus:outline-none"
-    >
-      {/* Barra de Filtros, Densidad y Buscador */}
-      <div className="px-4 py-3 border-b border-[#E3E6EB] bg-[#F6F7F9] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* Pestañas de Filtro Clínico */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0" role="tablist">
-          {[
-            { id: 'TODOS', label: 'Todos', count: patients.length },
-            { id: 'OCULTO', label: 'Riesgo oculto silencioso', count: patients.filter((p) => p.categoria === 'OCULTO').length, isSilent: true },
-            { id: 'ALTO', label: 'Alto riesgo', count: patients.filter((p) => p.categoria === 'ALTO').length },
-            { id: 'MEDIO', label: 'Moderado', count: patients.filter((p) => p.categoria === 'MEDIO').length },
-            { id: 'CONTROLADO', label: 'Control óptimo', count: patients.filter((p) => p.categoria === 'CONTROLADO').length },
-          ].map((tab) => {
-            const isSelected = selectedFilter === tab.id;
-            return (
-              <button
-                key={tab.id}
-                role="tab"
-                aria-selected={isSelected}
-                onClick={() => {
-                  setSelectedFilter(tab.id);
-                  setFocusedIndex(0);
-                }}
-                className={`px-3 py-1.5 rounded-[4px] text-[12px] font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
-                  isSelected
-                    ? tab.isSilent
-                      ? 'bg-[#C2410C] text-white'
-                      : 'bg-[#1D3B6B] text-white'
-                    : 'bg-white text-[#5A6573] border border-[#E3E6EB] hover:text-[#0E1621] hover:bg-[#F0F2F5]'
-                }`}
-              >
-                <span>{tab.label}</span>
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-[4px] ${
-                    isSelected ? 'bg-white/20 text-white' : 'bg-[#F0F2F5] text-[#5A6573]'
+    <>
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+        {/* Barra de Filtros Clínicos y Buscador Único */}
+        <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          
+          {/* Pestañas de Decisión Clínica */}
+          <div className="flex items-center gap-1.5 overflow-x-auto" role="tablist">
+            {[
+              { id: 'TODOS', label: 'Todos', count: counts.total },
+              { id: 'MIRAR_HOY', label: 'Mirar hoy', count: counts.mirarHoy, isAlert: true },
+              { id: 'VIGILAR', label: 'Vigilar', count: counts.vigilar },
+              { id: 'ESTABLE', label: 'Estable', count: counts.estable },
+            ].map((tab) => {
+              const isSelected = selectedFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  role="tab"
+                  aria-selected={isSelected}
+                  onClick={() => setSelectedFilter(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    isSelected
+                      ? tab.isAlert
+                        ? 'bg-rose-700 text-white shadow-xs'
+                        : 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
-                  {tab.count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Selector de Densidad (Carbon) y Buscador */}
-        <div className="flex items-center gap-2">
-          {/* Toggle de Densidad */}
-          <div className="flex items-center bg-white border border-[#E3E6EB] rounded-[4px] p-0.5">
-            <button
-              onClick={() => setDensity('normal')}
-              title="Densidad normal (52px)"
-              className={`p-1 rounded-[3px] text-[#5A6573] transition-colors cursor-pointer ${
-                density === 'normal' ? 'bg-[#F0F2F5] text-[#1D3B6B]' : 'hover:text-[#0E1621]'
-              }`}
-            >
-              <AlignJustify className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setDensity('compact')}
-              title="Densidad compacta (40px)"
-              className={`p-1 rounded-[3px] text-[#5A6573] transition-colors cursor-pointer ${
-                density === 'compact' ? 'bg-[#F0F2F5] text-[#1D3B6B]' : 'hover:text-[#0E1621]'
-              }`}
-            >
-              <List className="w-3.5 h-3.5" />
-            </button>
+                  {tab.isAlert && <span className="w-1.5 h-1.5 rounded-full bg-rose-300" />}
+                  <span>{tab.label}</span>
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Campo de Búsqueda y Botón Ctrl+K */}
+          {/* Único Buscador Clínico Sencillo */}
           <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 text-[#8A94A3] absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
-              ref={searchInputRef}
               type="text"
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setFocusedIndex(0);
-              }}
-              placeholder="Buscar... (Pulsa / o Ctrl+K)"
-              className="w-full text-[12px] pl-9 pr-14 py-1.5 rounded-[4px] border border-[#CBD0D8] bg-white text-[#0E1621] placeholder-[#8A94A3] focus:border-[#1D3B6B] focus:outline-none"
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar paciente por nombre o ID..."
+              className="w-full text-xs pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:border-slate-800 focus:outline-none"
             />
-            <button
-              onClick={onOpenCommandMenu}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#5A6573] bg-[#F0F2F5] hover:bg-[#E3E6EB] px-1.5 py-0.5 rounded border border-[#E3E6EB] cursor-pointer"
-              title="Abrir menú de comandos"
-            >
-              Ctrl+K
-            </button>
           </div>
         </div>
-      </div>
 
-      {/* Tabla Clínica Perfectamente Cuadrada y con Anchos Rígidos Antidesbordamiento */}
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] text-left border-collapse">
-          <thead>
-            <tr className="border-b border-[#E3E6EB] bg-[#F6F7F9] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#5A6573] whitespace-nowrap">
-              <th className="py-2.5 pl-3 pr-1 w-9 min-w-[36px] text-center" title="Expandir fila inline"></th>
-              <th className="py-2.5 px-3 w-[180px] min-w-[180px]">Paciente / ID</th>
-              <th className="py-2.5 px-2 w-[86px] min-w-[86px] text-center">Modo</th>
-              <th className="py-2.5 px-3 w-[130px] min-w-[130px] text-right">eGFR (mL/min)</th>
-              <th className="py-2.5 px-3 w-[120px] min-w-[120px] text-right">UACR (mg/g)</th>
-              <th className="py-2.5 px-3 w-[95px] min-w-[95px] text-right">LDL (mg/dL)</th>
-              <th className="py-2.5 px-3 w-[110px] min-w-[110px] text-center">Tendencia (12m)</th>
-              <th className="py-2.5 px-3 w-[190px] min-w-[190px]">Estratificación</th>
-              <th className="py-2.5 px-4 min-w-[260px]">Disparador Principal</th>
-              <th className="py-2.5 px-4 w-[125px] min-w-[125px] text-right">Acción</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#E3E6EB] text-[13px]">
-            {filteredPatients.length === 0 ? (
-              <tr>
-                <td colSpan="10" className="py-12 text-center text-[13px] text-[#5A6573]">
-                  No se encontraron pacientes con los criterios indicados.
-                </td>
+        {/* Tabla de Decisiones Simplificada: SIN SCROLL HORIZONTAL */}
+        <div className="w-full">
+          <table className="w-full table-fixed text-left border-collapse">
+            <thead>
+              <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500 bg-slate-50/75 border-b border-slate-200">
+                <th className="py-3 px-4 w-[24%]">Paciente</th>
+                <th className="py-3 px-3 w-[16%]">Decisión</th>
+                <th className="py-3 px-3 w-[26%]">Tendencia eGFR (12m)</th>
+                <th className="py-3 px-3 w-[20%]">Motivo de Decisión</th>
+                <th className="py-3 px-4 w-[14%] text-right">Acción</th>
               </tr>
-            ) : (
-              filteredPatients.map((p, idx) => {
-                const isSelectedRow = focusedIndex === idx;
-                const isExpanded = expandedPatientId === p.id;
-                const isSilent = p.categoria === 'OCULTO';
-                const isCrit = p.categoria === 'ALTO';
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-xs">
+              {filteredPatients.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="py-10 text-center text-xs text-slate-500">
+                    No hay pacientes con el criterio de decisión seleccionado.
+                  </td>
+                </tr>
+              ) : (
+                filteredPatients.map((p, idx) => {
+                  const status = getDecisionStatus(p.categoria);
+                  const isExpanded = expandedPatientId === p.id;
+                  const isSilent = p.categoria === 'OCULTO';
+                  const isIntervenido = !!p.intervenido;
 
-                // Datos analíticos
-                const egfrActual = p.valores_clave?.egfr?.actual;
-                const egfrPrevio = p.valores_clave?.egfr?.previo;
-                const deltaEgfr = p.valores_clave?.egfr?.delta;
+                  const egfrAct = p.valores_clave?.egfr?.actual;
+                  const egfrPrev = p.valores_clave?.egfr?.previo;
+                  const deltaEgfr = p.valores_clave?.egfr?.delta;
 
-                const uacrActual = p.valores_clave?.uacr?.actual;
-                const uacrPrevio = p.valores_clave?.uacr?.previo;
-                const deltaUacr = p.valores_clave?.uacr?.delta;
+                  // Puntos reales de la analítica del paciente
+                  const sparkPoints = egfrPrev !== null && egfrPrev !== undefined
+                    ? [egfrPrev, egfrAct]
+                    : [egfrAct, egfrAct];
 
-                const ldlActual = p.valores_clave?.ldl?.actual;
+                  return (
+                    <React.Fragment key={p.id}>
+                      <tr
+                        onClick={() => {
+                          setExpandedPatientId(prev => (prev === p.id ? null : p.id));
+                        }}
+                        style={{ animationDelay: `${idx * 30}ms` }}
+                        className={`cursor-pointer transition-colors animate-stagger-fade ${
+                          isExpanded
+                            ? 'bg-slate-100/70'
+                            : isIntervenido
+                            ? 'bg-emerald-50/20 hover:bg-emerald-50/40'
+                            : isSilent
+                            ? 'bg-rose-50/20 hover:bg-rose-50/40'
+                            : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        {/* 1. Paciente */}
+                        <td className="py-3 px-4">
+                          <div className="font-semibold text-slate-900 leading-tight">
+                            {p.nombre}
+                          </div>
+                          <div className="text-[11px] font-mono text-slate-500 mt-0.5">
+                            {p.id} • {p.edad}a • {p.sexo}
+                          </div>
+                        </td>
 
-                // Sparkline T-1 vs T
-                const sparkPoints = egfrPrevio !== null && egfrPrevio !== undefined
-                  ? [egfrPrevio, egfrActual]
-                  : [egfrActual, egfrActual];
-
-                // Borde lateral fino del color de estado (Linear Design)
-                const leftBorderStyle = isSelectedRow || isExpanded
-                  ? isSilent
-                    ? 'border-l-[3px] border-l-[#C2410C]'
-                    : isCrit
-                    ? 'border-l-[3px] border-l-[#B3261E]'
-                    : 'border-l-[3px] border-l-[#1D3B6B]'
-                  : 'border-l-[3px] border-l-transparent';
-
-                const rowHeightClass = isCompact ? 'h-[40px]' : 'h-[52px]';
-
-                return (
-                  <React.Fragment key={p.id}>
-                    {/* Fila Principal del Paciente */}
-                    <tr
-                      onClick={() => handleRowClick(p, idx)}
-                      className={`${rowHeightClass} ${leftBorderStyle} cursor-pointer transition-colors ${
-                        isExpanded
-                          ? 'bg-[#F0F4FA]'
-                          : isSelectedRow
-                          ? 'bg-[#F0F2F5]'
-                          : 'hover:bg-[#F6F7F9]'
-                      } ${isSilent && !isExpanded ? 'bg-[#FDEFE6]/20' : ''}`}
-                    >
-                      {/* Chevron de Expansión Inline */}
-                      <td className="py-1.5 pl-3 pr-1 w-9 min-w-[36px] text-center shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => toggleExpandOnly(e, p.id)}
-                          aria-label={isExpanded ? 'Contraer detalle inline' : 'Expandir detalle inline'}
-                          className="p-1 rounded hover:bg-[#E3E6EB] text-[#5A6573] hover:text-[#0E1621] transition-colors cursor-pointer"
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="w-3.5 h-3.5 text-[#1D3B6B]" />
+                        {/* 2. Estado / Decisión */}
+                        <td className="py-3 px-3">
+                          {isIntervenido ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold bg-emerald-50 text-emerald-800 border-emerald-300">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Cita Reasignada</span>
+                            </span>
                           ) : (
-                            <ChevronRight className="w-3.5 h-3.5 text-[#8A94A3]" />
-                          )}
-                        </button>
-                      </td>
-
-                      {/* Paciente / ID (Rígido, sin saltos de línea extraños) */}
-                      <td className="py-1.5 px-3 w-[180px] min-w-[180px] whitespace-nowrap">
-                        <div className="font-semibold text-[#0E1621] leading-tight whitespace-nowrap">
-                          {p.nombre}
-                        </div>
-                        <div className="text-[11px] font-mono text-[#5A6573] whitespace-nowrap">
-                          {p.id} • {p.edad}a • {p.sexo}
-                        </div>
-                      </td>
-
-                      {/* Modo (Píldora fija que no se parte nunca) */}
-                      <td className="py-1.5 px-2 w-[86px] min-w-[86px] text-center whitespace-nowrap">
-                        <span className={`inline-block whitespace-nowrap text-[10px] font-mono px-2 py-0.5 rounded-[4px] border ${
-                          p.tiene_progresion
-                            ? 'bg-[#E8EEF7] text-[#1D3B6B] border-[#CBD0D8] font-semibold'
-                            : 'bg-[#F0F2F5] text-[#5A6573] border-[#E3E6EB]'
-                        }`}>
-                          {p.tiene_progresion ? 'Modo B' : 'Modo A'}
-                        </span>
-                      </td>
-
-                      {/* eGFR con delta perfectamente blindado contra wrap de paréntesis */}
-                      <td className="py-1.5 px-3 w-[130px] min-w-[130px] text-right font-mono tabular-nums whitespace-nowrap">
-                        <div className="inline-flex items-baseline justify-end gap-1.5 whitespace-nowrap">
-                          <span className="font-semibold text-[#0E1621]">
-                            {egfrActual}
-                          </span>
-                          {deltaEgfr !== null && deltaEgfr !== undefined && (
-                            <span
-                              className={`text-[11px] font-medium whitespace-nowrap ${
-                                deltaEgfr < -5 ? 'text-[#C2410C]' : 'text-[#1F7A55]'
-                              }`}
-                              title={`Delta interanual: ${deltaEgfr > 0 ? `+${deltaEgfr}` : deltaEgfr} mL/min`}
-                            >
-                              ({deltaEgfr > 0 ? `+${deltaEgfr}` : deltaEgfr})
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* UACR con delta perfectamente blindado */}
-                      <td className="py-1.5 px-3 w-[120px] min-w-[120px] text-right font-mono tabular-nums whitespace-nowrap">
-                        <div className="inline-flex items-baseline justify-end gap-1.5 whitespace-nowrap">
-                          <span className="font-semibold text-[#0E1621]">
-                            {uacrActual}
-                          </span>
-                          {deltaUacr !== null && deltaUacr !== undefined && (
-                            <span
-                              className={`text-[11px] font-medium whitespace-nowrap ${
-                                deltaUacr > 0 ? 'text-[#C2410C]' : 'text-[#1F7A55]'
-                              }`}
-                              title={`Delta interanual: ${deltaUacr > 0 ? `+${deltaUacr}` : deltaUacr} mg/g`}
-                            >
-                              ({deltaUacr > 0 ? `+${deltaUacr}` : deltaUacr})
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* LDL */}
-                      <td className="py-1.5 px-3 w-[95px] min-w-[95px] text-right font-mono tabular-nums font-semibold text-[#0E1621] whitespace-nowrap">
-                        {ldlActual}
-                      </td>
-
-                      {/* Tendencia Sparkline */}
-                      <td className="py-1.5 px-3 w-[110px] min-w-[110px] text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center">
-                          <Sparkline
-                            points={sparkPoints}
-                            isSilent={isSilent}
-                            isCritical={isCrit}
-                            isFavorable={deltaEgfr !== null && deltaEgfr >= 0}
-                            ariaLabel={`Trayectoria eGFR: ${sparkPoints.join(' a ')} mL/min`}
-                          />
-                        </div>
-                      </td>
-
-                      {/* Estratificación (Badge Clínico Sobrio) */}
-                      <td className="py-1.5 px-3 w-[190px] min-w-[190px] whitespace-nowrap">
-                        <RiskBadge variant={p.categoria} />
-                      </td>
-
-                      {/* Disparador Principal (Frase médica completa) */}
-                      <td className="py-1.5 px-4 min-w-[260px] text-[12px] text-[#5A6573] leading-snug">
-                        {p.disparador_principal}
-                      </td>
-
-                      {/* Acción: Botón "Ver detalle" */}
-                      <td className="py-1.5 px-4 w-[125px] min-w-[125px] text-right whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={(e) => handleActionClick(e, p, idx)}
-                          className={`px-3 py-1 rounded-[4px] text-[12px] font-medium border transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap ${
-                            isSilent
-                              ? 'bg-[#C2410C] hover:bg-[#9A3412] text-white border-transparent'
-                              : 'bg-white hover:bg-[#F0F2F5] text-[#1D3B6B] border-[#CBD0D8]'
-                          }`}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Ver detalle</span>
-                        </button>
-                      </td>
-                    </tr>
-
-                    {/* Fila Expandible Inline (Carbon Design System) */}
-                    {isExpanded && (
-                      <tr className="bg-[#FAFBFD] border-b border-[#E3E6EB]">
-                        <td colSpan="10" className="p-0">
-                          <div className={`p-4 border-l-[4px] ${isSilent ? 'border-l-[#C2410C]' : isCrit ? 'border-l-[#B3261E]' : 'border-l-[#1D3B6B]'} space-y-3.5`}>
-                            
-                            {/* Alerta Diagnóstica Inmediata */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-[#E3E6EB]">
-                              <div className="flex items-center gap-2">
-                                <AlertOctagon className={`w-4 h-4 shrink-0 ${isSilent ? 'text-[#C2410C]' : 'text-[#1D3B6B]'}`} />
-                                <span className="text-[13px] font-semibold text-[#0E1621]">
-                                  {p.conclusion_diagnostica}
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${status.badgeClass}`}>
+                              {status.id === 'MIRAR_HOY' ? (
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-20" />
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600" />
                                 </span>
-                              </div>
-                              <span className="text-[11px] font-mono text-[#5A6573]">
-                                Origen: {p.archivo}
-                              </span>
+                              ) : (
+                                <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
+                              )}
+                              <span>{status.label}</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 3. Tendencia eGFR con Puntos Reales e Inicial -> Actual Monospaciado */}
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-18 shrink-0">
+                              <Sparkline
+                                points={sparkPoints}
+                                isSilent={isSilent}
+                                isCritical={p.categoria === 'ALTO'}
+                                isFavorable={deltaEgfr !== null && deltaEgfr >= 0}
+                                ariaLabel={`Evolución eGFR: ${sparkPoints.join(' a ')}`}
+                              />
                             </div>
+                            <div className="font-mono text-xs tabular-nums text-slate-700">
+                              {egfrPrev !== null && egfrPrev !== undefined ? (
+                                <span>
+                                  <span className="font-medium">{egfrPrev}</span> → <span className="font-semibold text-slate-900">{egfrAct}</span>
+                                  <span className={`ml-1.5 font-medium ${deltaEgfr < -5 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                    ({deltaEgfr > 0 ? `+${deltaEgfr}` : deltaEgfr} mL)
+                                  </span>
+                                </span>
+                              ) : (
+                                <span className="font-semibold text-slate-900">{egfrAct} mL/min</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
 
-                            {/* Panel de 3 Columnas: Trayectoria | Algoritmo y KDIGO | Acciones */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-[12px]">
+                        {/* 4. Motivo de Decisión con buen interlineado */}
+                        <td className="py-3 px-3 text-xs leading-relaxed text-slate-600 line-clamp-2">
+                          {getShortReason(p)}
+                        </td>
+
+                        {/* 5. Acción Directa */}
+                        <td className="py-3 px-4 text-right">
+                          {isSilent || p.categoria === 'ALTO' ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onIntervenePatient?.(p);
+                                }}
+                                className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all inline-flex items-center gap-1 cursor-pointer shadow-2xs ${
+                                  isIntervenido
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
+                                    : 'bg-slate-900 hover:bg-slate-800 text-white'
+                                }`}
+                                title="Reprogramar cita y conciliar pauta preventiva"
+                              >
+                                <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>{isIntervenido ? 'Plan' : 'Intervenir'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSelectPatient(p);
+                                }}
+                                className="bg-transparent hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 p-1.5 rounded-md text-xs transition-all inline-flex items-center cursor-pointer shadow-2xs"
+                                title="Ver segunda opinión completa"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-slate-500" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectPatient(p);
+                              }}
+                              className="bg-transparent hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs hover:text-slate-900"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Ver decisión</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+
+                      {/* Despliegue Rápido Inline: Pauta Inmediata para el Médico */}
+                      {isExpanded && (
+                        <tr className="bg-slate-50/90 border-b border-slate-200">
+                          <td colSpan="5" className="p-0">
+                            <div className={`p-4 border-l-4 ${isSilent ? 'border-l-rose-600' : 'border-l-slate-800'} space-y-3`}>
                               
-                              {/* 1. Trayectoria Analítica (Modo B) */}
-                              <div className="bg-white p-3 rounded-[5px] border border-[#E3E6EB] space-y-2">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#5A6573] block">
-                                  Trayectoria Interanual (12 Meses)
-                                </span>
-                                <div className="space-y-1.5">
-                                  <div className="flex justify-between items-baseline font-mono whitespace-nowrap">
-                                    <span className="text-[#5A6573]">eGFR:</span>
-                                    <span className="font-semibold text-[#0E1621] tabular-nums whitespace-nowrap">
-                                      {egfrPrevio !== null ? `${egfrPrevio} → ${egfrActual}` : egfrActual} mL/min
-                                      {deltaEgfr !== null && (
-                                        <span className={`ml-1 text-[11px] whitespace-nowrap ${deltaEgfr < 0 ? 'text-[#C2410C]' : 'text-[#1F7A55]'}`}>
-                                          ({deltaEgfr > 0 ? `+${deltaEgfr}` : deltaEgfr})
-                                        </span>
-                                      )}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between items-baseline font-mono whitespace-nowrap">
-                                    <span className="text-[#5A6573]">UACR:</span>
-                                    <span className="font-semibold text-[#0E1621] tabular-nums whitespace-nowrap">
-                                      {uacrPrevio !== null ? `${uacrPrevio} → ${uacrActual}` : uacrActual} mg/g
-                                      {deltaUacr !== null && (
-                                        <span className={`ml-1 text-[11px] whitespace-nowrap ${deltaUacr > 0 ? 'text-[#C2410C]' : 'text-[#1F7A55]'}`}>
-                                          (+{deltaUacr})
-                                        </span>
-                                      )}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between items-baseline font-mono whitespace-nowrap">
-                                    <span className="text-[#5A6573]">Creatinina:</span>
-                                    <span className="font-semibold text-[#0E1621] tabular-nums whitespace-nowrap">
-                                      {p.valores_clave?.creatinina?.actual} mg/dL
-                                      <span className="text-[10px] text-[#A16207] ml-1 font-normal">(Rango normal)</span>
-                                    </span>
-                                  </div>
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                                <div className="text-xs font-bold text-slate-900">
+                                  {p.conclusion_diagnostica}
                                 </div>
+                                <span className="text-[11px] font-mono text-slate-500">
+                                  Creatinina: {p.valores_clave?.creatinina?.actual} mg/dL • UACR: {p.valores_clave?.uacr?.actual} mg/g
+                                </span>
                               </div>
 
-                              {/* 2. Criterio Algorítmico y KDIGO */}
-                              <div className="bg-white p-3 rounded-[5px] border border-[#E3E6EB] space-y-2">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#5A6573] block">
-                                  Disparador y Vector KDIGO
-                                </span>
-                                <p className="text-[11px] text-[#0E1621] leading-relaxed">
-                                  <strong>Causa:</strong> {p.disparador_principal}
-                                </p>
-                                <div className="pt-1 flex items-center gap-1.5 whitespace-nowrap">
-                                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#FDEFE6] text-[#C2410C] border border-[#F4D0BD] font-bold whitespace-nowrap">
-                                    Migración G1-A1 → G2-A2
-                                  </span>
-                                  <span className="text-[11px] text-[#5A6573] whitespace-nowrap">
-                                    PAS: {p.valores_clave?.pas?.actual} mmHg
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* 3. Acciones Clínicas Inmediatas */}
-                              <div className="bg-white p-3 rounded-[5px] border border-[#E3E6EB] flex flex-col justify-between gap-2.5">
-                                <div>
-                                  <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#1D3B6B] block mb-1">
-                                    Recomendación Preventiva AP
-                                  </span>
-                                  <p className="text-[11px] text-[#5A6573] line-clamp-2">
-                                    {p.recomendacion_preventiva}
+                              {/* 3 Cuidados Clínicos para Decidir en Consulta */}
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                                <div className="p-3 rounded-lg bg-white border border-slate-200 space-y-1">
+                                  <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                                    <Pill className="w-3.5 h-3.5 text-blue-600" />
+                                    <span>Pauta Farmacológica</span>
+                                  </div>
+                                  <p className="text-slate-600 text-[11px]">
+                                    Iniciar iSGLT2 (Dapagliflozina / Empagliflozina 10mg/d)
                                   </p>
                                 </div>
 
-                                <div className="flex items-center gap-2 pt-1 whitespace-nowrap">
-                                  <button
-                                    type="button"
-                                    onClick={() => onSelectPatient(p)}
-                                    className="flex-1 px-3 py-1.5 rounded-[4px] bg-[#1D3B6B] hover:bg-[#162E54] text-white text-[11px] font-medium transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
-                                  >
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                    <span>Abrir 4 Gráficos 2ª Opinión</span>
-                                  </button>
+                                <div className="p-3 rounded-lg bg-amber-50/70 border border-amber-200 space-y-1">
+                                  <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                                    <span>Precaución (Nefrotóxicos)</span>
+                                  </div>
+                                  <p className="text-amber-900 text-[11px]">
+                                    Prohibir o evitar AINEs (Ibuprofeno/Naproxeno)
+                                  </p>
+                                </div>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => alert(`Ficha de ${p.nombre} exportada para citación preventiva en Atención Primaria.`)}
-                                    className="px-2.5 py-1.5 rounded-[4px] border border-[#CBD0D8] hover:bg-[#F0F2F5] text-[#5A6573] text-[11px] font-medium transition-colors cursor-pointer"
-                                    title="Exportar informe del paciente"
-                                  >
-                                    <FileText className="w-3.5 h-3.5" />
-                                  </button>
+                                <div className="p-3 rounded-lg bg-emerald-50/70 border border-emerald-200 space-y-1">
+                                  <div className="flex items-center gap-1.5 font-bold text-emerald-950">
+                                    <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Seguimiento en AP</span>
+                                  </div>
+                                  <p className="text-emerald-900 text-[11px]">
+                                    Control de UACR y tensión en 60 días con enfermería
+                                  </p>
                                 </div>
                               </div>
 
-                            </div>
+                              {/* Botones de Acción Inline */}
+                              <div className="flex items-center justify-end gap-2.5 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCarePlanPatient(p);
+                                  }}
+                                  className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                >
+                                  <Printer className="w-3.5 h-3.5 text-slate-500" />
+                                  <span>Hoja para el paciente</span>
+                                </button>
 
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onIntervenePatient?.(p);
+                                  }}
+                                  className="bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                                >
+                                  <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>Priorizar e Intervenir</span>
+                                </button>
+                              </div>
+
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+
+      {/* Modal de Hoja de Cuidados para el Paciente */}
+      <PatientCarePlanModal
+        isOpen={!!carePlanPatient}
+        onClose={() => setCarePlanPatient(null)}
+        patient={carePlanPatient}
+      />
+    </>
   );
 };
 
