@@ -9,7 +9,13 @@ EXPECTED_FEATURES = [
     "colesterol_total", "fuma", "diabetes", "egfr", "uacr",
     "delta_egfr", "delta_uacr", "delta_ap_hi", "delta_colesterol", "delta_bmi"
 ]
-EXPECTED_COLUMNS = EXPECTED_FEATURES + ["target_cardio"]
+EXPECTED_TARGETS = [
+    "target_cardio",
+    "target_aterosclerotico",
+    "target_insuficiencia_cardiaca",
+    "target_cardiorrenal",
+]
+EXPECTED_COLUMNS = EXPECTED_FEATURES + EXPECTED_TARGETS
 
 
 def test_prepare_data_module_import():
@@ -88,5 +94,7 @@ def test_cardiorenal_and_delta_synthesis():
     assert "delta_egfr" in df_synth.columns
     assert "delta_uacr" in df_synth.columns
 
-    # Comprobar que target_cardio sea binario 0 o 1
-    assert set(df_synth["target_cardio"].unique()).issubset({0, 1})
+    # Comprobar que los targets sean binarios 0 o 1
+    for target_col in EXPECTED_TARGETS:
+        assert target_col in df_synth.columns, f"Falta el target {target_col}"
+        assert set(df_synth[target_col].unique()).issubset({0, 1})

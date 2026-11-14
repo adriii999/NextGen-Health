@@ -1,6 +1,9 @@
 # Entrenamiento de los modelos
 
-El pipeline lee `data/raw/dataset.csv` y espera las 15 variables de entrada que consume la API, además de tres objetivos binarios. Los nombres de objetivos actuales son provisionales y se configuran en `scripts/train_models.py`.
+El pipeline lee `data/processed/dataset_preprocessed.csv` (generado por `model/scripts/prepare_data.py` integrando NutriSynthCare, Kaggle CVD y CDC NHANES) y espera las 15 variables de entrada continuas y de evolución que consume la API, además de los tres objetivos clínicos binarios:
+- `target_aterosclerotico`: Riesgo de enfermedad vascular aterosclerótica (ASCVD).
+- `target_insuficiencia_cardiaca`: Sobrecarga hemodinámica e insuficiencia cardíaca.
+- `target_cardiorrenal`: Síndrome cardiorrenal según guías KDIGO 2024 y progresión rápida de eGFR.
 
 ```powershell
 python -m pip install -r model/requirements.txt
@@ -10,9 +13,7 @@ python model/scripts/train_models.py
 También se pueden indicar rutas explícitas:
 
 ```powershell
-python model/scripts/train_models.py --dataset data/raw/dataset.csv --output model/out/model_artifact.joblib
+python model/scripts/train_models.py --dataset data/processed/dataset_preprocessed.csv --output model/out/model_artifact.joblib
 ```
 
-El script valida el esquema y los tipos, conserva los deltas ausentes como `NaN`, evalúa cada objetivo por separado y guarda los tres XGBoost, los explicadores TreeSHAP, umbrales y métricas en un único artefacto. El backend carga ese artefacto en `ModelService`.
-
-La salida de Recall se mide en el holdout y no se garantiza por configurar un objetivo de Recall para seleccionar el umbral. Los objetivos necesitan definiciones confirmadas, suficientes positivos y negativos y un horizonte temporal apropiado. Este pipeline no valida clínicamente el dataset ni vuelve clínico un modelo por el mero hecho de entrenarlo.
+El script valida el esquema y los tipos, conserva los deltas ausentes como `NaN` (Modo A para pacientes sin historial longitudinal previo), evalúa cada objetivo por separado mediante validación cruzada estratificada (5 folds) y holdout, ajusta umbrales de decisión calibrados para maximizar la detección precoz (Recall) y exporta los tres clasificadores XGBoost (`hist`), los explicadores TreeSHAP reales, los umbrales y las métricas en un único artefacto compatible con `ModelService`.
