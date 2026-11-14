@@ -20,17 +20,31 @@ El dataset final unifica **tres fuentes complementarias** para cubrir todas las 
      * Presión arterial múltiple (`BPXSY1`, `BPXDI1`), tabaquismo activo (`SMQ`) e historial cardiovascular (`MCQ`).
 
 * **Total registros brutos combinados:** 89.924
-* **Filtrado fisiológico:** 2.099 registros atípicos eliminados.
-* **Dataset procesado final:** **87.825 registros limpios**.
-* **Distribución Target:** $48.5\%$ eventos (`target_cardio=1`) vs $51.5\%$ controles (`target_cardio=0`).
+* **Filtrado fisiológico:** 2.102 registros atípicos eliminados.
+* **Dataset procesado final:** **87.822 registros limpios**.
+* **Distribución Targets:**
+  * `target_cardio`: 53.8% positivos.
+  * `target_aterosclerotico`: 46.7% positivos (ASCVD / perfil lipídico / tabaquismo).
+  * `target_insuficiencia_cardiaca`: 49.1% positivos (sobrecarga hemodinámica / HTA / obesidad / diabetes).
+  * `target_cardiorrenal`: 60.5% positivos (KDIGO 2024 / progresores rápidos con $\Delta_{eGFR} \le -5$ mL/min/año / albuminuria).
 
 ---
 
-## 2. Archivo y Localización
+## 2. Archivo, Scripts y Validación
 
-* **Ruta:** `data/processed/dataset_preprocessed.csv`
+* **Ruta del dataset:** `data/processed/dataset_preprocessed.csv`
 * **Script generador:** `model/scripts/prepare_data.py`
-* **Test de validación:** `tests/test_prepare_data.py`
+* **Script de profiling y calidad:** `scripts/validate_dataset.py`
+* **Tests unitarios automatizados:** `tests/test_prepare_data.py` y `tests/test_model_training.py`
+
+Comandos de ejecución:
+```powershell
+# Regenerar dataset
+python model/scripts/prepare_data.py
+
+# Validar calidad clínica y distribuciones
+python scripts/validate_dataset.py
+```
 
 ---
 
@@ -59,10 +73,13 @@ El dataset final unifica **tres fuentes complementarias** para cubrir todas las 
 | `delta_colesterol` | Float | $\text{mg/dL/año}$ | $\approx 25\%$ | Variación interanual en perfil lipídico |
 | `delta_bmi` | Float | $\text{kg/m}^2/\text{año}$ | $\approx 25\%$ | Variación ponderal anual |
 
-### Target
-| Columna | Tipo | Valores | Descripción |
+### Targets Clínicos (Fenotipos Multi-Riesgo)
+| Columna | Tipo | Valores | Significado Clínico y Guías |
 | :--- | :--- | :--- | :--- |
 | `target_cardio` | Entero | `0` / `1` | Presencia de evento o daño cardiovascular/cardiorrenal significativo |
+| `target_aterosclerotico` | Entero | `0` / `1` | Enfermedad vascular aterosclerótica (ASCVD) impulsada por dislipidemia, tabaquismo y PAS |
+| `target_insuficiencia_cardiaca` | Entero | `0` / `1` | Sobrecarga hemodinámica e insuficiencia cardíaca (HTA, IMC elevado, diabetes) |
+| `target_cardiorrenal` | Entero | `0` / `1` | Síndrome cardiorrenal según guías KDIGO 2024 (eGFR < 60, UACR $\ge 30$, progresores rápidos $\le -5$) |
 
 ---
 

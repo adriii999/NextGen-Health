@@ -59,6 +59,9 @@ def filter_physiological_outliers(df: pd.DataFrame) -> pd.DataFrame:
     if "edad" in df.columns:
         mask = mask & (df["edad"] >= 30.0) & (df["edad"] <= 85.0)
 
+    if "colesterol_total" in df.columns:
+        mask = mask & (df["colesterol_total"] >= 80.0) & (df["colesterol_total"] <= 450.0)
+
     cleaned = df[mask].copy().reset_index(drop=True)
     dropped = initial_len - len(cleaned)
     if dropped > 0:
