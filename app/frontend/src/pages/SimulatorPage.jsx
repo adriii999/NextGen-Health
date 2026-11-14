@@ -5,7 +5,7 @@ import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { RiskRadarChart } from '../components/charts/RiskRadarChart';
 import { ShapImpactBar } from '../components/charts/ShapImpactBar';
-import { Badge } from '../components/common/Badge';
+import { RiskBadge } from '../components/common/RiskBadge';
 import { analiticasService } from '../services/analiticasService';
 
 const PRESETS = {
@@ -142,58 +142,70 @@ export const SimulatorPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       
-      {/* Cabecera y Presets */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Cabecera y Presets Clínicos */}
+      <div className="bg-white p-4 rounded-[6px] border border-[#E3E6EB] flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Sliders className="w-5 h-5 text-indigo-600" />
-            Simulador Clínico Interactivo (Modo A / Modo B)
+          <h2 className="text-[14px] font-semibold text-[#0E1621] flex items-center gap-2">
+            <Sliders className="w-4 h-4 text-[#1D3B6B]" />
+            <span>Simulador Clínico Interactivo (Modo A / Modo B)</span>
           </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Modifica parámetros analíticos en tiempo real o carga perfiles predefinidos para evaluar la respuesta de la IA.
+          <p className="text-[12px] text-[#5A6573] mt-0.5">
+            Evaluación dinámica de parámetros analíticos para contrastar la trampa de normalidad clínica en Atención Primaria.
           </p>
         </div>
 
         {/* Botones de Presets */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-slate-400">Casos Tipo:</span>
-          <Button variant="secondary" size="sm" onClick={() => handleApplyPreset('silente')}>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-semibold text-[#5A6573]">Casos de Prueba:</span>
+          <button
+            onClick={() => handleApplyPreset('silente')}
+            className="px-2.5 py-1 rounded-[4px] border border-[#CBD0D8] hover:bg-[#F0F2F5] text-[11px] font-medium text-[#1D3B6B] transition-colors"
+          >
             Caso Silente
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => handleApplyPreset('sano')}>
+          </button>
+          <button
+            onClick={() => handleApplyPreset('sano')}
+            className="px-2.5 py-1 rounded-[4px] border border-[#CBD0D8] hover:bg-[#F0F2F5] text-[11px] font-medium text-[#5A6573] transition-colors"
+          >
             Control Sano
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => handleApplyPreset('modoA')}>
+          </button>
+          <button
+            onClick={() => handleApplyPreset('modoA')}
+            className="px-2.5 py-1 rounded-[4px] border border-[#CBD0D8] hover:bg-[#F0F2F5] text-[11px] font-medium text-[#5A6573] transition-colors"
+          >
             Modo A (Sin Δ)
-          </Button>
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
         {/* Formulario de Entrada (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
-          <Card title="Datos de Entrada de la Analítica" padding="p-5">
+          <div className="bg-white rounded-[6px] border border-[#E3E6EB] p-4">
+            <h3 className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[#5A6573] mb-3 border-b border-[#E3E6EB] pb-2">
+              Parámetros de Laboratorio y Constantes del Paciente
+            </h3>
             
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">Edad</label>
+                <label className="text-[11px] font-medium text-[#5A6573] block mb-1">Edad (años)</label>
                 <input
                   type="number"
                   value={form.edad}
                   onChange={(e) => handleInputChange('edad', Number(e.target.value))}
-                  className="w-full text-xs p-2 rounded-lg border border-slate-300 font-mono"
+                  className="w-full text-[12px] p-1.5 rounded-[4px] border border-[#CBD0D8] font-mono focus:border-[#1D3B6B] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">Sexo</label>
+                <label className="text-[11px] font-medium text-[#5A6573] block mb-1">Sexo</label>
                 <select
                   value={form.sexo}
                   onChange={(e) => handleInputChange('sexo', e.target.value)}
-                  className="w-full text-xs p-2 rounded-lg border border-slate-300"
+                  className="w-full text-[12px] p-1.5 rounded-[4px] border border-[#CBD0D8] focus:border-[#1D3B6B] focus:outline-none bg-white"
                 >
                   <option value="Hombre">Hombre</option>
                   <option value="Mujer">Mujer</option>
@@ -201,80 +213,80 @@ export const SimulatorPage = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">PAS (mmHg)</label>
+                <label className="text-[11px] font-medium text-[#5A6573] block mb-1">PAS (mmHg)</label>
                 <input
                   type="number"
                   value={form.presion_sistolica}
                   onChange={(e) => handleInputChange('presion_sistolica', Number(e.target.value))}
-                  className="w-full text-xs p-2 rounded-lg border border-slate-300 font-mono"
+                  className="w-full text-[12px] p-1.5 rounded-[4px] border border-[#CBD0D8] font-mono focus:border-[#1D3B6B] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">eGFR (mL/min)</label>
+                <label className="text-[11px] font-medium text-[#5A6573] block mb-1">eGFR (mL/min)</label>
                 <input
                   type="number"
                   value={form.filtrado_egfr}
                   onChange={(e) => handleInputChange('filtrado_egfr', Number(e.target.value))}
-                  className="w-full text-xs p-2 rounded-lg border border-slate-300 font-mono font-bold text-indigo-700"
+                  className="w-full text-[12px] p-1.5 rounded-[4px] border border-[#CBD0D8] font-mono font-semibold text-[#1D3B6B] focus:border-[#1D3B6B] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">UACR (mg/g)</label>
+                <label className="text-[11px] font-medium text-[#5A6573] block mb-1">UACR (mg/g)</label>
                 <input
                   type="number"
                   value={form.cociente_uacr}
                   onChange={(e) => handleInputChange('cociente_uacr', Number(e.target.value))}
-                  className="w-full text-xs p-2 rounded-lg border border-slate-300 font-mono font-bold text-indigo-700"
+                  className="w-full text-[12px] p-1.5 rounded-[4px] border border-[#CBD0D8] font-mono font-semibold text-[#1D3B6B] focus:border-[#1D3B6B] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">Creatinina (mg/dL)</label>
+                <label className="text-[11px] font-medium text-[#5A6573] block mb-1">Creatinina (mg/dL)</label>
                 <input
                   type="number"
                   step="0.05"
                   value={form.creatinina}
                   onChange={(e) => handleInputChange('creatinina', Number(e.target.value))}
-                  className="w-full text-xs p-2 rounded-lg border border-slate-300 font-mono"
+                  className="w-full text-[12px] p-1.5 rounded-[4px] border border-[#CBD0D8] font-mono focus:border-[#1D3B6B] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">Colesterol LDL (mg/dL)</label>
+                <label className="text-[11px] font-medium text-[#5A6573] block mb-1">Colesterol LDL (mg/dL)</label>
                 <input
                   type="number"
                   value={form.colesterol_ldl}
                   onChange={(e) => handleInputChange('colesterol_ldl', Number(e.target.value))}
-                  className="w-full text-xs p-2 rounded-lg border border-slate-300 font-mono"
+                  className="w-full text-[12px] p-1.5 rounded-[4px] border border-[#CBD0D8] font-mono focus:border-[#1D3B6B] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">Colesterol HDL (mg/dL)</label>
+                <label className="text-[11px] font-medium text-[#5A6573] block mb-1">Colesterol HDL (mg/dL)</label>
                 <input
                   type="number"
                   value={form.colesterol_hdl}
                   onChange={(e) => handleInputChange('colesterol_hdl', Number(e.target.value))}
-                  className="w-full text-xs p-2 rounded-lg border border-slate-300 font-mono"
+                  className="w-full text-[12px] p-1.5 rounded-[4px] border border-[#CBD0D8] font-mono focus:border-[#1D3B6B] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">HbA1c (%)</label>
+                <label className="text-[11px] font-medium text-[#5A6573] block mb-1">HbA1c (%)</label>
                 <input
                   type="number"
                   step="0.1"
                   value={form.hemoglobina_hba1c}
                   onChange={(e) => handleInputChange('hemoglobina_hba1c', Number(e.target.value))}
-                  className="w-full text-xs p-2 rounded-lg border border-slate-300 font-mono"
+                  className="w-full text-[12px] p-1.5 rounded-[4px] border border-[#CBD0D8] font-mono focus:border-[#1D3B6B] focus:outline-none"
                 />
               </div>
             </div>
 
             {/* Toggle de Progresión Temporal (Modo B) */}
-            <div className="mt-5 pt-4 border-t border-slate-100">
+            <div className="mt-5 pt-4 border-t border-[#E3E6EB]">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <input
@@ -282,52 +294,52 @@ export const SimulatorPage = () => {
                     id="toggleProgresion"
                     checked={form.activarProgresion}
                     onChange={(e) => handleInputChange('activarProgresion', e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                    className="w-4 h-4 text-[#1D3B6B] rounded border-[#CBD0D8]"
                   />
-                  <label htmlFor="toggleProgresion" className="text-xs font-bold text-slate-800 cursor-pointer">
-                    Activar Modo B (Comparar con analítica previa de hace ~12 meses)
+                  <label htmlFor="toggleProgresion" className="text-[12px] font-semibold text-[#0E1621] cursor-pointer">
+                    Activar Modo B (Comparar con analítica de hace ~12 meses)
                   </label>
                 </div>
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
-                  form.activarProgresion ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-500'
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-[4px] border font-bold ${
+                  form.activarProgresion ? 'bg-[#E8EEF7] text-[#1D3B6B] border-[#CBD0D8]' : 'bg-[#F0F2F5] text-[#5A6573] border-[#E3E6EB]'
                 }`}>
                   {form.activarProgresion ? 'MODO B ACTIVO' : 'MODO A (FOTO FIJA)'}
                 </span>
               </div>
 
               {form.activarProgresion && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-indigo-50/40 rounded-lg border border-indigo-100">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-[#F6F7F9] rounded-[5px] border border-[#E3E6EB]">
                   <div>
-                    <label className="text-[10px] font-semibold text-indigo-900 block mb-0.5">
+                    <label className="text-[10px] font-semibold text-[#5A6573] block mb-0.5">
                       Δ eGFR (mL/min)
                     </label>
                     <input
                       type="number"
                       value={form.delta_egfr}
                       onChange={(e) => handleInputChange('delta_egfr', Number(e.target.value))}
-                      className="w-full text-xs p-1.5 rounded border border-indigo-200 font-mono bg-white text-rose-700 font-bold"
+                      className="w-full text-[12px] p-1.5 rounded-[4px] border border-[#CBD0D8] font-mono bg-white text-[#C2410C] font-bold"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-indigo-900 block mb-0.5">
+                    <label className="text-[10px] font-semibold text-[#5A6573] block mb-0.5">
                       Δ UACR (mg/g)
                     </label>
                     <input
                       type="number"
                       value={form.delta_uacr}
                       onChange={(e) => handleInputChange('delta_uacr', Number(e.target.value))}
-                      className="w-full text-xs p-1.5 rounded border border-indigo-200 font-mono bg-white text-rose-700 font-bold"
+                      className="w-full text-[12px] p-1.5 rounded-[4px] border border-[#CBD0D8] font-mono bg-white text-[#C2410C] font-bold"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-indigo-900 block mb-0.5">
+                    <label className="text-[10px] font-semibold text-[#5A6573] block mb-0.5">
                       Δ PAS (mmHg)
                     </label>
                     <input
                       type="number"
                       value={form.delta_pas}
                       onChange={(e) => handleInputChange('delta_pas', Number(e.target.value))}
-                      className="w-full text-xs p-1.5 rounded border border-indigo-200 font-mono bg-white"
+                      className="w-full text-[12px] p-1.5 rounded-[4px] border border-[#CBD0D8] font-mono bg-white"
                     />
                   </div>
                 </div>
@@ -335,71 +347,74 @@ export const SimulatorPage = () => {
             </div>
 
             <div className="mt-5 flex justify-end">
-              <Button
-                variant="primary"
-                size="md"
-                icon={Play}
-                loading={loading}
+              <button
+                type="button"
+                disabled={loading}
                 onClick={handleSimular}
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto px-4 py-2 rounded-[5px] bg-[#1D3B6B] hover:bg-[#162E54] text-white text-[12px] font-medium transition-colors inline-flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
               >
-                Ejecutar Inferencia Clínica
-              </Button>
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>{loading ? 'Calculando inferencia...' : 'Ejecutar Inferencia Clínica'}</span>
+              </button>
             </div>
 
-          </Card>
+          </div>
         </div>
 
         {/* Panel de Resultados (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
-          <Card title="Resultado de Inferencia y Explicabilidad" padding="p-5">
+          <div className="bg-white rounded-[6px] border border-[#E3E6EB] p-4">
+            <h3 className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[#5A6573] mb-3 border-b border-[#E3E6EB] pb-2">
+              Resultado de Inferencia y Explicabilidad
+            </h3>
+
             {!resultado ? (
-              <div className="py-14 text-center text-slate-400">
-                <Stethoscope className="w-10 h-10 mx-auto text-slate-300 mb-2 stroke-[1.5]" />
-                <p className="text-xs font-medium">
-                  Introduce los valores y pulsa "Ejecutar Inferencia Clínica" para ver la estratificación multidimensional y los factores SHAP.
+              <div className="py-14 text-center text-[#8A94A3]">
+                <Stethoscope className="w-9 h-9 mx-auto text-[#CBD0D8] mb-2 stroke-[1.5]" />
+                <p className="text-[12px] max-w-xs mx-auto">
+                  Introduce los valores analíticos y pulsa "Ejecutar Inferencia Clínica" para obtener la estratificación y explicabilidad.
                 </p>
               </div>
             ) : (
-              <div className="space-y-4 animate-in fade-in">
+              <div className="space-y-3.5">
                 
-                {/* Veredicto */}
-                <div className={`p-3.5 rounded-xl border ${
+                {/* Veredicto Diagnóstico */}
+                <div className={`p-3.5 rounded-[5px] border ${
                   resultado.nivel_prioridad === 'ALTA'
-                    ? 'bg-rose-50 border-rose-200 text-rose-950'
+                    ? 'bg-[#FDEFE6] border-[#F4D0BD] text-[#842A06]'
                     : resultado.nivel_prioridad === 'MEDIA'
-                    ? 'bg-amber-50 border-amber-200 text-amber-950'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                    ? 'bg-[#FBF3DD] border-[#F2DFAC] text-[#714405]'
+                    : 'bg-[#E6F4EC] border-[#BDDFC9] text-[#16563C]'
                 }`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider">
+                    <span className="text-[11px] font-bold uppercase tracking-[0.04em]">
                       Prioridad: {resultado.nivel_prioridad}
                     </span>
-                    <Badge variant={resultado.nivel_prioridad === 'ALTA' ? 'OCULTO' : resultado.nivel_prioridad === 'MEDIA' ? 'MEDIO' : 'CONTROLADO'} size="sm" />
+                    <RiskBadge variant={resultado.nivel_prioridad === 'ALTA' ? 'OCULTO' : resultado.nivel_prioridad === 'MEDIA' ? 'MEDIO' : 'CONTROLADO'} />
                   </div>
-                  <p className="text-xs font-semibold mt-1">
+                  <p className="text-[12px] font-semibold mt-1">
                     {resultado.conclusion_diagnostica}
                   </p>
                 </div>
 
                 {/* Radar */}
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="bg-[#F6F7F9] p-3 rounded-[5px] border border-[#E3E6EB]">
                   <RiskRadarChart tiposRiesgo={resultado.tiposRiesgo || resultado.tipos_riesgo} />
                 </div>
 
                 {/* SHAP */}
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="bg-[#F6F7F9] p-3 rounded-[5px] border border-[#E3E6EB]">
                   <ShapImpactBar factoresClave={resultado.factoresClave || resultado.factores_clave} />
                 </div>
 
                 {/* Recomendación */}
-                <div className="p-3 bg-indigo-50/70 rounded-xl border border-indigo-100 text-xs text-indigo-950">
+                <div className="p-3 bg-[#E8EEF7] rounded-[5px] border border-[#CBD0D8] text-[12px] text-[#1D3B6B]">
                   <strong>Recomendación AP:</strong> {resultado.recomendacion_preventiva}
                 </div>
 
               </div>
             )}
-          </Card>
+          </div>
         </div>
 
       </div>

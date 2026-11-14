@@ -15,8 +15,8 @@ export function App() {
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0E1621] flex flex-col font-sans antialiased">
       
-      {/* Cabecera Clínica Institucional de Alta Precisión */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[#E3E6EB]">
+      {/* Cabecera Clínica Institucional de Alta Precisión (Sobria, sin badges superfluos) */}
+      <header className="sticky top-0 z-40 bg-white border-b border-[#E3E6EB] shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
         <div className="max-w-[1280px] mx-auto px-6">
           <div className="flex items-center justify-between h-14">
             
@@ -53,7 +53,7 @@ export function App() {
                     role="tab"
                     aria-selected={isActive}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`h-full border-b-2 text-[13px] font-medium transition-colors px-1 flex items-center relative ${
+                    className={`h-full border-b-2 text-[13px] font-medium transition-colors px-1 flex items-center relative cursor-pointer ${
                       isActive
                         ? 'border-[#1D3B6B] text-[#1D3B6B] font-semibold'
                         : 'border-transparent text-[#5A6573] hover:text-[#0E1621] hover:border-[#CBD0D8]'
@@ -70,7 +70,7 @@ export function App() {
               {/* Botón de Búsqueda Universal tipo Linear / Stripe */}
               <button
                 onClick={handleOpenSearch}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-[5px] bg-[#F6F7F9] hover:bg-[#F0F2F5] border border-[#E3E6EB] hover:border-[#CBD0D8] text-[12px] text-[#5A6573] transition-colors"
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-[5px] bg-[#F6F7F9] hover:bg-[#F0F2F5] border border-[#E3E6EB] hover:border-[#CBD0D8] text-[12px] text-[#5A6573] transition-colors cursor-pointer"
                 title="Buscar paciente o acción clínica (Ctrl+K)"
               >
                 <Search className="w-3.5 h-3.5 text-[#8A94A3]" />
@@ -80,14 +80,17 @@ export function App() {
                 </kbd>
               </button>
 
-              {/* Perfil del Facultativo */}
-              <div className="flex items-center gap-2 pl-1 border-l border-[#E3E6EB]">
+              {/* Perfil del Facultativo en Atención Primaria con Estado Operativo */}
+              <div className="flex items-center gap-2 pl-2 border-l border-[#E3E6EB]">
                 <div className="w-6 h-6 rounded-full bg-[#E8EEF7] border border-[#CBD0D8] text-[#1D3B6B] flex items-center justify-center font-mono text-[10px] font-bold">
                   AP
                 </div>
-                <span className="text-[12px] font-medium text-[#0E1621] hidden lg:inline">
-                  Consulta Médica
-                </span>
+                <div className="hidden lg:flex items-center gap-1.5">
+                  <span className="text-[12px] font-medium text-[#0E1621]">
+                    Consulta Médica
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#1F7A55]" title="Sistema operativo" />
+                </div>
               </div>
             </div>
 
@@ -102,18 +105,17 @@ export function App() {
         {activeTab === 'ingest' && <IngestPage />}
       </main>
 
-      {/* Pie de Página Clínico */}
-      <footer className="border-t border-[#E3E6EB] bg-white py-3 mt-auto">
+      {/* Pie de Página Institucional Sobrio */}
+      <footer className="border-t border-[#E3E6EB] bg-white py-3">
         <div className="max-w-[1280px] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between text-[11px] text-[#5A6573] gap-2">
-          <p>
-            <strong>NextGen Health</strong> — Sistema de Apoyo a la Decisión Clínica en Atención Primaria. Detección precoz del deterioro silente cardiorrenal.
-          </p>
-          <p className="font-mono">
+          <span>
+            NextGen Health — Sistema de Apoyo a la Decisión Clínica en Atención Primaria. Detección precoz del deterioro silente cardiorrenal.
+          </span>
+          <span className="font-mono">
             Grupo 33 • 8ª Edición Hackathon Boehringer Ingelheim
-          </p>
+          </span>
         </div>
       </footer>
-
     </div>
   );
 }
