@@ -1,13 +1,16 @@
 // src/components/drawer/PatientDrawer.jsx
-import React, { useEffect, useRef } from 'react';
-import { X, FileText, CheckCircle2, AlertOctagon } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, FileText, CheckCircle2, AlertOctagon, Layers, TrendingUp, Grid, ShieldAlert } from 'lucide-react';
 import { RiskBadge } from '../common/RiskBadge';
 import { ClinicalTimelineChart } from '../charts/ClinicalTimelineChart';
 import { ShapWaterfallChart } from '../charts/ShapWaterfallChart';
 import { ProblemMatrixChart } from '../charts/ProblemMatrixChart';
+import { KdigoMatrixChart } from '../charts/KdigoMatrixChart';
+import { InterventionProjectionChart } from '../charts/InterventionProjectionChart';
 import { AlgorithmExplainer } from './AlgorithmExplainer';
 
 export const PatientDrawer = ({ patient, onClose }) => {
+  const [activeAnalysisTab, setActiveAnalysisTab] = useState('kdigo'); // 'kdigo', 'projection', 'problems', 'shap'
   const drawerRef = useRef(null);
 
   // Manejo de tecla ESC para cerrar el drawer
@@ -26,6 +29,11 @@ export const PatientDrawer = ({ patient, onClose }) => {
   const { valores_clave, factores_clave, tipos_riesgo } = patient;
   const isSilent = patient.categoria === 'OCULTO';
 
+  const egfrAct = valores_clave?.egfr?.actual || 68;
+  const egfrPrev = valores_clave?.egfr?.previo || 86;
+  const uacrAct = valores_clave?.uacr?.actual || 35;
+  const uacrPrev = valores_clave?.uacr?.previo || 18;
+
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop sutil con clic para cerrar */}
@@ -38,7 +46,7 @@ export const PatientDrawer = ({ patient, onClose }) => {
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
         <div
           ref={drawerRef}
-          className="w-screen max-w-[540px] bg-white border-l border-[#E3E6EB] shadow-lg flex flex-col drawer-enter"
+          className="w-screen max-w-[560px] bg-white border-l border-[#E3E6EB] shadow-lg flex flex-col drawer-enter"
           role="dialog"
           aria-modal="true"
           aria-labelledby="drawer-title"
@@ -99,7 +107,7 @@ export const PatientDrawer = ({ patient, onClose }) => {
               </div>
             </div>
 
-            {/* 2. Lista Resumen Estilo NHS (Etiqueta izquierda, Valor derecha con tabular-nums) */}
+            {/* 2. Resumen Estilo NHS (Etiqueta izquierda, Valor derecha con tabular-nums) */}
             <div className="bg-white rounded-[6px] border border-[#E3E6EB] p-3.5">
               <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#5A6573] block mb-2 border-b border-[#E3E6EB] pb-1.5">
                 Datos de Laboratorio y Constantes Clínicas
@@ -108,7 +116,7 @@ export const PatientDrawer = ({ patient, onClose }) => {
                 <div className="py-1.5 flex justify-between items-baseline">
                   <dt className="text-[#5A6573]">Filtrado Glomerular (eGFR):</dt>
                   <dd className="font-mono font-semibold text-[#0E1621] tabular-nums">
-                    {valores_clave?.egfr?.actual} mL/min/1.73m²
+                    {egfrAct} mL/min/1.73m²
                     {valores_clave?.egfr?.delta && (
                       <span className={`ml-1 text-[11px] ${valores_clave.egfr.delta < 0 ? 'text-[#C2410C]' : 'text-[#1F7A55]'}`}>
                         (Δ {valores_clave.egfr.delta} mL/min)
@@ -119,7 +127,7 @@ export const PatientDrawer = ({ patient, onClose }) => {
                 <div className="py-1.5 flex justify-between items-baseline">
                   <dt className="text-[#5A6573]">Albuminuria Orina (UACR):</dt>
                   <dd className="font-mono font-semibold text-[#0E1621] tabular-nums">
-                    {valores_clave?.uacr?.actual} mg/g
+                    {uacrAct} mg/g
                     {valores_clave?.uacr?.delta && (
                       <span className={`ml-1 text-[11px] ${valores_clave.uacr.delta > 0 ? 'text-[#C2410C]' : 'text-[#1F7A55]'}`}>
                         (Δ +{valores_clave.uacr.delta} mg/g)
@@ -150,26 +158,106 @@ export const PatientDrawer = ({ patient, onClose }) => {
 
             {/* 3. Línea Temporal de Analíticas (Apple Health + Our World in Data) */}
             <ClinicalTimelineChart
-              egfrActual={valores_clave?.egfr?.actual}
-              egfrPrevio={valores_clave?.egfr?.previo}
-              uacrActual={valores_clave?.uacr?.actual}
-              uacrPrevio={valores_clave?.uacr?.previo}
+              egfrActual={egfrAct}
+              egfrPrevio={egfrPrev}
+              uacrActual={uacrAct}
+              uacrPrevio={uacrPrev}
               archivoOrigen={patient.archivo}
             />
 
             {/* 4. Por qué se clasifica así (Reglas paso a paso) */}
             <AlgorithmExplainer patient={patient} />
 
-            {/* 5. Desglose Explicable SHAP en Cascada (Waterfall) */}
-            <ShapWaterfallChart
-              factoresClave={factores_clave}
-              riesgoFinal={tipos_riesgo?.riesgo_cardiorrenal?.valor || 0.44}
-            />
+            {/* 5. SEGUNDA OPINIÓN CLÍNICA: Pestañas de Análisis Gráfico de Alto Nivel */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#0E1621]">
+                  Visualizaciones de Segunda Opinión Clínica
+                </span>
+                <span className="text-[10px] font-mono text-[#5A6573]">4 Gráficos Especializados</span>
+              </div>
 
-            {/* 6. Gráfico de Segunda Opinión Clínica (Árbol de problemas) */}
-            <ProblemMatrixChart patient={patient} />
+              {/* Selector de Pestañas de Gráficos */}
+              <div className="flex items-center gap-1 bg-[#E3E6EB] p-1 rounded-[6px] overflow-x-auto">
+                <button
+                  onClick={() => setActiveAnalysisTab('kdigo')}
+                  className={`px-2.5 py-1 text-[11px] font-medium rounded-[4px] transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                    activeAnalysisTab === 'kdigo'
+                      ? 'bg-white text-[#1D3B6B] font-semibold shadow-xs'
+                      : 'text-[#5A6573] hover:text-[#0E1621]'
+                  }`}
+                >
+                  <Grid className="w-3.5 h-3.5" />
+                  <span>Matriz KDIGO 2D</span>
+                </button>
 
-            {/* 7. Plan Preventivo en Atención Primaria */}
+                <button
+                  onClick={() => setActiveAnalysisTab('projection')}
+                  className={`px-2.5 py-1 text-[11px] font-medium rounded-[4px] transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                    activeAnalysisTab === 'projection'
+                      ? 'bg-white text-[#1D3B6B] font-semibold shadow-xs'
+                      : 'text-[#5A6573] hover:text-[#0E1621]'
+                  }`}
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span>Proyección 3 Años</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveAnalysisTab('shap')}
+                  className={`px-2.5 py-1 text-[11px] font-medium rounded-[4px] transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                    activeAnalysisTab === 'shap'
+                      ? 'bg-white text-[#1D3B6B] font-semibold shadow-xs'
+                      : 'text-[#5A6573] hover:text-[#0E1621]'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>SHAP Cascada</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveAnalysisTab('problems')}
+                  className={`px-2.5 py-1 text-[11px] font-medium rounded-[4px] transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                    activeAnalysisTab === 'problems'
+                      ? 'bg-white text-[#1D3B6B] font-semibold shadow-xs'
+                      : 'text-[#5A6573] hover:text-[#0E1621]'
+                  }`}
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <span>Árbol Problemas</span>
+                </button>
+              </div>
+
+              {/* Render del Gráfico Seleccionado */}
+              {activeAnalysisTab === 'kdigo' && (
+                <KdigoMatrixChart
+                  egfrActual={egfrAct}
+                  egfrPrevio={egfrPrev}
+                  uacrActual={uacrAct}
+                  uacrPrevio={uacrPrev}
+                />
+              )}
+
+              {activeAnalysisTab === 'projection' && (
+                <InterventionProjectionChart
+                  egfrActual={egfrAct}
+                  nombrePaciente={patient.nombre}
+                />
+              )}
+
+              {activeAnalysisTab === 'shap' && (
+                <ShapWaterfallChart
+                  factoresClave={factores_clave}
+                  riesgoFinal={tipos_riesgo?.riesgo_cardiorrenal?.valor || 0.44}
+                />
+              )}
+
+              {activeAnalysisTab === 'problems' && (
+                <ProblemMatrixChart patient={patient} />
+              )}
+            </div>
+
+            {/* 6. Plan Preventivo en Atención Primaria */}
             <div className="bg-white rounded-[6px] border border-[#E3E6EB] p-4 space-y-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#1D3B6B] block">
                 Recomendación Médica Preventiva en AP
