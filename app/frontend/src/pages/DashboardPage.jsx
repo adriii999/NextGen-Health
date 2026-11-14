@@ -1,10 +1,11 @@
 // src/pages/DashboardPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { KpiCard } from '../components/common/KpiCard';
 import { TableSkeleton } from '../components/common/TableSkeleton';
 import { PatientTable } from '../components/folderView/PatientTable';
 import { PatientDrawer } from '../components/drawer/PatientDrawer';
+import { CommandMenu } from '../components/common/CommandMenu';
 import { AnalyzeFolderButton } from '../components/common/AnalyzeFolderButton';
 import { analiticasService } from '../services/analiticasService';
 import { MOCK_PATIENTS } from '../mock/patientsData';
@@ -12,6 +13,7 @@ import { MOCK_PATIENTS } from '../mock/patientsData';
 export const DashboardPage = () => {
   const [patients, setPatients] = useState(MOCK_PATIENTS);
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null);
 
@@ -142,6 +144,7 @@ export const DashboardPage = () => {
         <PatientTable
           patients={patients}
           onSelectPatient={(p) => setSelectedPatient(p)}
+          onOpenCommandMenu={() => setIsCommandMenuOpen(true)}
         />
       )}
 
@@ -152,6 +155,15 @@ export const DashboardPage = () => {
           onClose={() => setSelectedPatient(null)}
         />
       )}
+
+      {/* Menú de Comandos Accesible con Ctrl+K */}
+      <CommandMenu
+        isOpen={isCommandMenuOpen}
+        onClose={() => setIsCommandMenuOpen(false)}
+        patients={patients}
+        onSelectPatient={(p) => setSelectedPatient(p)}
+        onAnalyzeFolder={handleAnalyzeFolder}
+      />
     </div>
   );
 };
