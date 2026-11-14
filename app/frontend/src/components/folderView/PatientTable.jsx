@@ -89,7 +89,6 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
 
   const handleRowClick = (patient, idx) => {
     setFocusedIndex(idx);
-    // Alternar expansión inline en la tabla y abrir panel
     setExpandedPatientId(prev => (prev === patient.id ? null : patient.id));
     onSelectPatient(patient);
   };
@@ -136,7 +135,7 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
                   setSelectedFilter(tab.id);
                   setFocusedIndex(0);
                 }}
-                className={`px-3 py-1.5 rounded-[4px] text-[12px] font-medium transition-colors flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-[4px] text-[12px] font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
                   isSelected
                     ? tab.isSilent
                       ? 'bg-[#C2410C] text-white'
@@ -164,7 +163,7 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
             <button
               onClick={() => setDensity('normal')}
               title="Densidad normal (52px)"
-              className={`p-1 rounded-[3px] text-[#5A6573] transition-colors ${
+              className={`p-1 rounded-[3px] text-[#5A6573] transition-colors cursor-pointer ${
                 density === 'normal' ? 'bg-[#F0F2F5] text-[#1D3B6B]' : 'hover:text-[#0E1621]'
               }`}
             >
@@ -173,7 +172,7 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
             <button
               onClick={() => setDensity('compact')}
               title="Densidad compacta (40px)"
-              className={`p-1 rounded-[3px] text-[#5A6573] transition-colors ${
+              className={`p-1 rounded-[3px] text-[#5A6573] transition-colors cursor-pointer ${
                 density === 'compact' ? 'bg-[#F0F2F5] text-[#1D3B6B]' : 'hover:text-[#0E1621]'
               }`}
             >
@@ -197,7 +196,7 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
             />
             <button
               onClick={onOpenCommandMenu}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#5A6573] bg-[#F0F2F5] hover:bg-[#E3E6EB] px-1.5 py-0.5 rounded border border-[#E3E6EB]"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#5A6573] bg-[#F0F2F5] hover:bg-[#E3E6EB] px-1.5 py-0.5 rounded border border-[#E3E6EB] cursor-pointer"
               title="Abrir menú de comandos"
             >
               Ctrl+K
@@ -206,21 +205,21 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
         </div>
       </div>
 
-      {/* Tabla Clínica con soporte de Filas Expandibles (Carbon Design) */}
+      {/* Tabla Clínica Perfectamente Cuadrada y con Anchos Rígidos Antidesbordamiento */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full min-w-[1180px] text-left border-collapse">
           <thead>
-            <tr className="border-b border-[#E3E6EB] bg-[#F6F7F9] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#5A6573]">
-              <th className="py-2.5 pl-3 pr-1 w-8 text-center" title="Expandir fila inline"></th>
-              <th className="py-2.5 px-3">Paciente / ID</th>
-              <th className="py-2.5 px-2.5">Modo</th>
-              <th className="py-2.5 px-3 text-right">eGFR (mL/min)</th>
-              <th className="py-2.5 px-3 text-right">UACR (mg/g)</th>
-              <th className="py-2.5 px-3 text-right">LDL (mg/dL)</th>
-              <th className="py-2.5 px-3 text-center">Tendencia (12m)</th>
-              <th className="py-2.5 px-3">Estratificación</th>
-              <th className="py-2.5 px-4 min-w-[240px]">Disparador Principal</th>
-              <th className="py-2.5 px-4 text-right">Acción</th>
+            <tr className="border-b border-[#E3E6EB] bg-[#F6F7F9] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#5A6573] whitespace-nowrap">
+              <th className="py-2.5 pl-3 pr-1 w-9 min-w-[36px] text-center" title="Expandir fila inline"></th>
+              <th className="py-2.5 px-3 w-[180px] min-w-[180px]">Paciente / ID</th>
+              <th className="py-2.5 px-2 w-[86px] min-w-[86px] text-center">Modo</th>
+              <th className="py-2.5 px-3 w-[130px] min-w-[130px] text-right">eGFR (mL/min)</th>
+              <th className="py-2.5 px-3 w-[120px] min-w-[120px] text-right">UACR (mg/g)</th>
+              <th className="py-2.5 px-3 w-[95px] min-w-[95px] text-right">LDL (mg/dL)</th>
+              <th className="py-2.5 px-3 w-[110px] min-w-[110px] text-center">Tendencia (12m)</th>
+              <th className="py-2.5 px-3 w-[190px] min-w-[190px]">Estratificación</th>
+              <th className="py-2.5 px-4 min-w-[260px]">Disparador Principal</th>
+              <th className="py-2.5 px-4 w-[125px] min-w-[125px] text-right">Acción</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#E3E6EB] text-[13px]">
@@ -278,12 +277,12 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
                       } ${isSilent && !isExpanded ? 'bg-[#FDEFE6]/20' : ''}`}
                     >
                       {/* Chevron de Expansión Inline */}
-                      <td className="py-1.5 pl-3 pr-1 text-center">
+                      <td className="py-1.5 pl-3 pr-1 w-9 min-w-[36px] text-center shrink-0">
                         <button
                           type="button"
                           onClick={(e) => toggleExpandOnly(e, p.id)}
                           aria-label={isExpanded ? 'Contraer detalle inline' : 'Expandir detalle inline'}
-                          className="p-1 rounded hover:bg-[#E3E6EB] text-[#5A6573] hover:text-[#0E1621] transition-colors"
+                          className="p-1 rounded hover:bg-[#E3E6EB] text-[#5A6573] hover:text-[#0E1621] transition-colors cursor-pointer"
                         >
                           {isExpanded ? (
                             <ChevronDown className="w-3.5 h-3.5 text-[#1D3B6B]" />
@@ -293,19 +292,19 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
                         </button>
                       </td>
 
-                      {/* Paciente / ID */}
-                      <td className="py-1.5 px-3">
-                        <div className="font-semibold text-[#0E1621] leading-tight">
+                      {/* Paciente / ID (Rígido, sin saltos de línea extraños) */}
+                      <td className="py-1.5 px-3 w-[180px] min-w-[180px] whitespace-nowrap">
+                        <div className="font-semibold text-[#0E1621] leading-tight whitespace-nowrap">
                           {p.nombre}
                         </div>
-                        <div className="text-[11px] font-mono text-[#5A6573]">
+                        <div className="text-[11px] font-mono text-[#5A6573] whitespace-nowrap">
                           {p.id} • {p.edad}a • {p.sexo}
                         </div>
                       </td>
 
-                      {/* Modo */}
-                      <td className="py-1.5 px-2.5">
-                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-[4px] border ${
+                      {/* Modo (Píldora fija que no se parte nunca) */}
+                      <td className="py-1.5 px-2 w-[86px] min-w-[86px] text-center whitespace-nowrap">
+                        <span className={`inline-block whitespace-nowrap text-[10px] font-mono px-2 py-0.5 rounded-[4px] border ${
                           p.tiene_progresion
                             ? 'bg-[#E8EEF7] text-[#1D3B6B] border-[#CBD0D8] font-semibold'
                             : 'bg-[#F0F2F5] text-[#5A6573] border-[#E3E6EB]'
@@ -314,72 +313,78 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
                         </span>
                       </td>
 
-                      {/* eGFR */}
-                      <td className="py-1.5 px-3 text-right font-mono tabular-nums">
-                        <span className="font-semibold text-[#0E1621]">
-                          {egfrActual}
-                        </span>
-                        {deltaEgfr !== null && deltaEgfr !== undefined && (
-                          <span
-                            className={`ml-1 text-[11px] font-medium ${
-                              deltaEgfr < -5 ? 'text-[#C2410C]' : 'text-[#1F7A55]'
-                            }`}
-                            title={`Delta: ${deltaEgfr > 0 ? `+${deltaEgfr}` : deltaEgfr} mL/min`}
-                          >
-                            ({deltaEgfr > 0 ? `+${deltaEgfr}` : deltaEgfr})
+                      {/* eGFR con delta perfectamente blindado contra wrap de paréntesis */}
+                      <td className="py-1.5 px-3 w-[130px] min-w-[130px] text-right font-mono tabular-nums whitespace-nowrap">
+                        <div className="inline-flex items-baseline justify-end gap-1.5 whitespace-nowrap">
+                          <span className="font-semibold text-[#0E1621]">
+                            {egfrActual}
                           </span>
-                        )}
+                          {deltaEgfr !== null && deltaEgfr !== undefined && (
+                            <span
+                              className={`text-[11px] font-medium whitespace-nowrap ${
+                                deltaEgfr < -5 ? 'text-[#C2410C]' : 'text-[#1F7A55]'
+                              }`}
+                              title={`Delta interanual: ${deltaEgfr > 0 ? `+${deltaEgfr}` : deltaEgfr} mL/min`}
+                            >
+                              ({deltaEgfr > 0 ? `+${deltaEgfr}` : deltaEgfr})
+                            </span>
+                          )}
+                        </div>
                       </td>
 
-                      {/* UACR */}
-                      <td className="py-1.5 px-3 text-right font-mono tabular-nums">
-                        <span className="font-semibold text-[#0E1621]">
-                          {uacrActual}
-                        </span>
-                        {deltaUacr !== null && deltaUacr !== undefined && (
-                          <span
-                            className={`ml-1 text-[11px] font-medium ${
-                              deltaUacr > 0 ? 'text-[#C2410C]' : 'text-[#1F7A55]'
-                            }`}
-                            title={`Delta: ${deltaUacr > 0 ? `+${deltaUacr}` : deltaUacr} mg/g`}
-                          >
-                            ({deltaUacr > 0 ? `+${deltaUacr}` : deltaUacr})
+                      {/* UACR con delta perfectamente blindado */}
+                      <td className="py-1.5 px-3 w-[120px] min-w-[120px] text-right font-mono tabular-nums whitespace-nowrap">
+                        <div className="inline-flex items-baseline justify-end gap-1.5 whitespace-nowrap">
+                          <span className="font-semibold text-[#0E1621]">
+                            {uacrActual}
                           </span>
-                        )}
+                          {deltaUacr !== null && deltaUacr !== undefined && (
+                            <span
+                              className={`text-[11px] font-medium whitespace-nowrap ${
+                                deltaUacr > 0 ? 'text-[#C2410C]' : 'text-[#1F7A55]'
+                              }`}
+                              title={`Delta interanual: ${deltaUacr > 0 ? `+${deltaUacr}` : deltaUacr} mg/g`}
+                            >
+                              ({deltaUacr > 0 ? `+${deltaUacr}` : deltaUacr})
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* LDL */}
-                      <td className="py-1.5 px-3 text-right font-mono tabular-nums font-semibold text-[#0E1621]">
+                      <td className="py-1.5 px-3 w-[95px] min-w-[95px] text-right font-mono tabular-nums font-semibold text-[#0E1621] whitespace-nowrap">
                         {ldlActual}
                       </td>
 
-                      {/* Tendencia */}
-                      <td className="py-1.5 px-3 text-center">
-                        <Sparkline
-                          points={sparkPoints}
-                          isSilent={isSilent}
-                          isCritical={isCrit}
-                          isFavorable={deltaEgfr !== null && deltaEgfr >= 0}
-                          ariaLabel={`Trayectoria eGFR: ${sparkPoints.join(' a ')} mL/min`}
-                        />
+                      {/* Tendencia Sparkline */}
+                      <td className="py-1.5 px-3 w-[110px] min-w-[110px] text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center">
+                          <Sparkline
+                            points={sparkPoints}
+                            isSilent={isSilent}
+                            isCritical={isCrit}
+                            isFavorable={deltaEgfr !== null && deltaEgfr >= 0}
+                            ariaLabel={`Trayectoria eGFR: ${sparkPoints.join(' a ')} mL/min`}
+                          />
+                        </div>
                       </td>
 
-                      {/* Estratificación */}
-                      <td className="py-1.5 px-3">
+                      {/* Estratificación (Badge Clínico Sobrio) */}
+                      <td className="py-1.5 px-3 w-[190px] min-w-[190px] whitespace-nowrap">
                         <RiskBadge variant={p.categoria} />
                       </td>
 
-                      {/* Disparador Principal (frase completa) */}
-                      <td className="py-1.5 px-4 text-[12px] text-[#5A6573] leading-snug">
+                      {/* Disparador Principal (Frase médica completa) */}
+                      <td className="py-1.5 px-4 min-w-[260px] text-[12px] text-[#5A6573] leading-snug">
                         {p.disparador_principal}
                       </td>
 
                       {/* Acción: Botón "Ver detalle" */}
-                      <td className="py-1.5 px-4 text-right">
+                      <td className="py-1.5 px-4 w-[125px] min-w-[125px] text-right whitespace-nowrap">
                         <button
                           type="button"
                           onClick={(e) => handleActionClick(e, p, idx)}
-                          className={`px-3 py-1 rounded-[4px] text-[12px] font-medium border transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                          className={`px-3 py-1 rounded-[4px] text-[12px] font-medium border transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap ${
                             isSilent
                               ? 'bg-[#C2410C] hover:bg-[#9A3412] text-white border-transparent'
                               : 'bg-white hover:bg-[#F0F2F5] text-[#1D3B6B] border-[#CBD0D8]'
@@ -419,31 +424,31 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
                                   Trayectoria Interanual (12 Meses)
                                 </span>
                                 <div className="space-y-1.5">
-                                  <div className="flex justify-between items-baseline font-mono">
+                                  <div className="flex justify-between items-baseline font-mono whitespace-nowrap">
                                     <span className="text-[#5A6573]">eGFR:</span>
-                                    <span className="font-semibold text-[#0E1621] tabular-nums">
+                                    <span className="font-semibold text-[#0E1621] tabular-nums whitespace-nowrap">
                                       {egfrPrevio !== null ? `${egfrPrevio} → ${egfrActual}` : egfrActual} mL/min
                                       {deltaEgfr !== null && (
-                                        <span className={`ml-1 text-[11px] ${deltaEgfr < 0 ? 'text-[#C2410C]' : 'text-[#1F7A55]'}`}>
+                                        <span className={`ml-1 text-[11px] whitespace-nowrap ${deltaEgfr < 0 ? 'text-[#C2410C]' : 'text-[#1F7A55]'}`}>
                                           ({deltaEgfr > 0 ? `+${deltaEgfr}` : deltaEgfr})
                                         </span>
                                       )}
                                     </span>
                                   </div>
-                                  <div className="flex justify-between items-baseline font-mono">
+                                  <div className="flex justify-between items-baseline font-mono whitespace-nowrap">
                                     <span className="text-[#5A6573]">UACR:</span>
-                                    <span className="font-semibold text-[#0E1621] tabular-nums">
+                                    <span className="font-semibold text-[#0E1621] tabular-nums whitespace-nowrap">
                                       {uacrPrevio !== null ? `${uacrPrevio} → ${uacrActual}` : uacrActual} mg/g
                                       {deltaUacr !== null && (
-                                        <span className={`ml-1 text-[11px] ${deltaUacr > 0 ? 'text-[#C2410C]' : 'text-[#1F7A55]'}`}>
+                                        <span className={`ml-1 text-[11px] whitespace-nowrap ${deltaUacr > 0 ? 'text-[#C2410C]' : 'text-[#1F7A55]'}`}>
                                           (+{deltaUacr})
                                         </span>
                                       )}
                                     </span>
                                   </div>
-                                  <div className="flex justify-between items-baseline font-mono">
+                                  <div className="flex justify-between items-baseline font-mono whitespace-nowrap">
                                     <span className="text-[#5A6573]">Creatinina:</span>
-                                    <span className="font-semibold text-[#0E1621] tabular-nums">
+                                    <span className="font-semibold text-[#0E1621] tabular-nums whitespace-nowrap">
                                       {p.valores_clave?.creatinina?.actual} mg/dL
                                       <span className="text-[10px] text-[#A16207] ml-1 font-normal">(Rango normal)</span>
                                     </span>
@@ -459,11 +464,11 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
                                 <p className="text-[11px] text-[#0E1621] leading-relaxed">
                                   <strong>Causa:</strong> {p.disparador_principal}
                                 </p>
-                                <div className="pt-1 flex items-center gap-1.5">
-                                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#FDEFE6] text-[#C2410C] border border-[#F4D0BD] font-bold">
+                                <div className="pt-1 flex items-center gap-1.5 whitespace-nowrap">
+                                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#FDEFE6] text-[#C2410C] border border-[#F4D0BD] font-bold whitespace-nowrap">
                                     Migración G1-A1 → G2-A2
                                   </span>
-                                  <span className="text-[11px] text-[#5A6573]">
+                                  <span className="text-[11px] text-[#5A6573] whitespace-nowrap">
                                     PAS: {p.valores_clave?.pas?.actual} mmHg
                                   </span>
                                 </div>
@@ -480,11 +485,11 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
                                   </p>
                                 </div>
 
-                                <div className="flex items-center gap-2 pt-1">
+                                <div className="flex items-center gap-2 pt-1 whitespace-nowrap">
                                   <button
                                     type="button"
                                     onClick={() => onSelectPatient(p)}
-                                    className="flex-1 px-3 py-1.5 rounded-[4px] bg-[#1D3B6B] hover:bg-[#162E54] text-white text-[11px] font-medium transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                                    className="flex-1 px-3 py-1.5 rounded-[4px] bg-[#1D3B6B] hover:bg-[#162E54] text-white text-[11px] font-medium transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
                                   >
                                     <ExternalLink className="w-3.5 h-3.5" />
                                     <span>Abrir 4 Gráficos 2ª Opinión</span>
@@ -493,7 +498,7 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
                                   <button
                                     type="button"
                                     onClick={() => alert(`Ficha de ${p.nombre} exportada para citación preventiva en Atención Primaria.`)}
-                                    className="px-2.5 py-1.5 rounded-[4px] border border-[#CBD0D8] hover:bg-[#F0F2F5] text-[#5A6573] text-[11px] font-medium transition-colors"
+                                    className="px-2.5 py-1.5 rounded-[4px] border border-[#CBD0D8] hover:bg-[#F0F2F5] text-[#5A6573] text-[11px] font-medium transition-colors cursor-pointer"
                                     title="Exportar informe del paciente"
                                   >
                                     <FileText className="w-3.5 h-3.5" />
