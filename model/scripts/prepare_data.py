@@ -241,13 +241,12 @@ def clean_and_harmonize_data(random_seed: int = 42) -> pd.DataFrame:
 
 def synthesize_cardiorenal_and_deltas(base_df: pd.DataFrame, random_seed: int = 42) -> pd.DataFrame:
     """
-    Completa los biomarcadores renales (eGFR y UACR) según directrices KDIGO 2024
-    para los registros que no los tienen de origen, preservando intactos los valores
-    reales medidos (como en NHANES), y genera las variaciones temporales longitudinales (Deltas).
+    Completa biomarcadores renales (eGFR y UACR), genera trayectorias longitudinales (Deltas)
+    fisiológicas continuas y modela el riesgo cardiovascular y cardiorrenal multidimensional
+    mediante funciones logísticas continuas alineadas con guías clínicas (SCORE2 / KDIGO 2024 / Framingham).
     
-    Regla de nulos para deltas:
-    Se inyecta exactamente un 25% de valores NaN en las columnas delta_* para
-    entrenar al modelo en la dualidad clínica (Modo A: analítica aislada sin histórico).
+    Inyecta exactamente un 25% de valores NaN en deltas para entrenar la dualidad clínica
+    (Modo A: analítica aislada vs Modo B: seguimiento longitudinal).
     """
     rng = np.random.default_rng(random_seed)
     n = len(base_df)
@@ -265,14 +264,12 @@ def synthesize_cardiorenal_and_deltas(base_df: pd.DataFrame, random_seed: int = 
         sub_age = df.loc[mask_need_egfr, "edad"].to_numpy()
         sub_diab = df.loc[mask_need_egfr, "diabetes"].to_numpy()
         sub_ap_hi = df.loc[mask_need_egfr, "ap_hi"].to_numpy()
-        sub_target = df.loc[mask_need_egfr, "target_cardio"].to_numpy()
 
         base_egfr = 98.0 - 0.75 * np.maximum(0.0, sub_age - 30.0)
-        penalty_diabetes = np.where(sub_diab == 1, rng.uniform(10.0, 22.0, size=sub_n), 0.0)
-        penalty_hta = np.where(sub_ap_hi >= 140.0, rng.uniform(6.0, 16.0, size=sub_n), 0.0)
+        penalty_diabetes = np.where(sub_diab == 1, rng.uniform(8.0, 18.0, size=sub_n), 0.0)
+        penalty_hta = np.where(sub_ap_hi >= 140.0, rng.uniform(5.0, 14.0, size=sub_n), 0.0)
         noise_egfr = rng.normal(0.0, 4.0, size=sub_n)
-        shift_target = np.where(sub_target == 1, rng.uniform(4.0, 12.0, size=sub_n), 0.0)
-        egfr_synth = base_egfr - penalty_diabetes - penalty_hta + noise_egfr - shift_target
+        egfr_synth = base_egfr - penalty_diabetes - penalty_hta + noise_egfr
         df.loc[mask_need_egfr, "egfr"] = np.round(np.clip(egfr_synth, 15.0, 125.0), 1)
 
     # --------------------------------------------------------------------------
@@ -285,21 +282,15 @@ def synthesize_cardiorenal_and_deltas(base_df: pd.DataFrame, random_seed: int = 
     if mask_need_uacr.any():
         sub_n = int(mask_need_uacr.sum())
         sub_diab = df.loc[mask_need_uacr, "diabetes"].to_numpy()
-        sub_target = df.loc[mask_need_uacr, "target_cardio"].to_numpy()
+        sub_ap_hi = df.loc[mask_need_uacr, "ap_hi"].to_numpy()
 
         uacr_normal = rng.lognormal(mean=2.2, sigma=0.45, size=sub_n)
         uacr_high = rng.uniform(32.0, 140.0, size=sub_n)
-        uacr_very_high = rng.uniform(150.0, 360.0, size=sub_n)
+        prob_micro = np.where(sub_diab == 1, 0.40, 0.12)
+        prob_micro = np.where(sub_ap_hi >= 145.0, prob_micro + 0.20, prob_micro)
 
-        prob_micro = np.where(sub_diab == 1, 0.45, 0.12)
-        prob_micro = np.where(sub_target == 1, prob_micro + 0.30, prob_micro)
-
-        random_draw = rng.random(sub_n)
-        mask_micro = (random_draw < prob_micro)
-        mask_macro = (random_draw < 0.05) & (sub_diab == 1) & (sub_target == 1)
-
-        uacr_final = np.where(mask_micro, uacr_high, uacr_normal)
-        uacr_final = np.where(mask_macro, uacr_very_high, uacr_final)
+        draw = rng.random(sub_n)
+        uacr_final = np.where(draw < prob_micro, uacr_high, uacr_normal)
         df.loc[mask_need_uacr, "uacr"] = np.round(np.clip(uacr_final, 3.0, 380.0), 1)
 
     # --------------------------------------------------------------------------
@@ -312,15 +303,18 @@ def synthesize_cardiorenal_and_deltas(base_df: pd.DataFrame, random_seed: int = 
     delta_bmi = np.zeros(n)
 
     for i in range(n):
-        is_target = df.iloc[i]["target_cardio"] == 1
-        is_diab = df.iloc[i]["diabetes"] == 1
+        diab_i = df.iloc[i]["diabetes"]
+        ap_i = df.iloc[i]["ap_hi"]
+        uacr_i = df.iloc[i]["uacr"]
 
-        if is_target or is_diab:
-            delta_egfr[i] = rng.normal(loc=-9.5, scale=3.5)
-            delta_uacr[i] = rng.uniform(8.0, 42.0)
-            delta_ap_hi[i] = rng.normal(loc=6.5, scale=4.0)
-            delta_col[i] = rng.normal(loc=5.0, scale=7.0)
-            delta_bmi[i] = rng.normal(loc=0.7, scale=0.5)
+        # Deterioro vascular/renal acelerado en presencia de comorbilidad metabólica
+        is_high_risk = (diab_i == 1 and uacr_i > 30.0) or ap_i >= 150.0 or (rng.random() < 0.22)
+        if is_high_risk:
+            delta_egfr[i] = rng.normal(loc=-7.5, scale=3.2)
+            delta_uacr[i] = rng.uniform(8.0, 35.0)
+            delta_ap_hi[i] = rng.normal(loc=5.5, scale=4.0)
+            delta_col[i] = rng.normal(loc=4.0, scale=7.0)
+            delta_bmi[i] = rng.normal(loc=0.6, scale=0.5)
         else:
             delta_egfr[i] = rng.normal(loc=-1.1, scale=1.4)
             delta_uacr[i] = rng.normal(loc=0.5, scale=2.5)
@@ -342,60 +336,54 @@ def synthesize_cardiorenal_and_deltas(base_df: pd.DataFrame, random_seed: int = 
     df.loc[mask_missing, delta_cols] = np.nan
 
     # --------------------------------------------------------------------------
-    # 5. ENRIQUECIMIENTO DEL TARGET CARDIORRENAL (ÉNFASIS RENAL KDIGO 2024)
-    # --------------------------------------------------------------------------
-    # Según guías KDIGO 2024 y ESC, la enfermedad renal es un equivalente cardiovascular.
-    # Se consolida como evento positivo (1) a:
-    # - Pacientes con evento previo (target_cardio == 1)
-    # - Progresores rápidos con caída renal severa (delta_egfr <= -6.0 mL/min/año)
-    # - Filtrado deteriorado con microalbuminuria (eGFR < 60 y uACR >= 30)
-    # - Macroalbuminuria franca (uACR >= 150 mg/g)
-    is_renal_adverse = (
-        ((df["egfr"] < 60.0) & (df["uacr"] >= 30.0)) |
-        (df["delta_egfr"] <= -6.0) |
-        (df["uacr"] >= 150.0)
-    )
-    df["target_cardio"] = np.where(is_renal_adverse, 1, df["target_cardio"])
-
-    # --------------------------------------------------------------------------
-    # 6. GENERACIÓN DE LOS TRES OBJETIVOS FENOTÍPICOS (MULTI-RIESGO CLÍNICO)
+    # 5. MODELADO DE RIESGO CLÍNICO CONTINUO Y MUESTREO DE BERNOULLI
     # --------------------------------------------------------------------------
     # A) Fenotipo Aterosclerótico (ASCVD / Placa / Isquemia):
-    is_ath = (
-        (df["target_cardio"] == 1) & (
-            (df["colesterol_total"] >= 190.0) |
-            (df["fuma"] == 1) |
-            (df["ap_hi"] >= 135.0) |
-            (df["delta_colesterol"].fillna(0.0) >= 4.0)
-        )
-    ) | (
-        (df["colesterol_total"] >= 230.0) & (df["fuma"] == 1) & (df["ap_hi"] >= 140.0)
+    logit_ath = (
+        -3.8
+        + 0.045 * (df["edad"] - 50.0)
+        + 0.028 * (df["ap_hi"] - 120.0)
+        + 0.016 * (df["colesterol_total"] - 190.0)
+        + 0.75 * df["fuma"]
+        + 0.65 * df["diabetes"]
+        + 0.03 * df["delta_ap_hi"].fillna(0.0)
+        + 0.02 * df["delta_colesterol"].fillna(0.0)
     )
-    df["target_aterosclerotico"] = is_ath.astype(int)
+    p_ath = 1.0 / (1.0 + np.exp(-logit_ath))
+    y_ath = (rng.random(n) < p_ath).astype(int)
+    df["target_aterosclerotico"] = y_ath
 
     # B) Fenotipo Insuficiencia Cardíaca (Sobrecarga hemodinámica / cardiometabólica):
-    is_hf = (
-        (df["target_cardio"] == 1) & (
-            (df["ap_hi"] >= 135.0) |
-            (df["bmi"] >= 28.0) |
-            (df["diabetes"] == 1) |
-            (df["delta_ap_hi"].fillna(0.0) >= 4.0)
-        )
-    ) | (
-        (df["ap_hi"] >= 150.0) & (df["bmi"] >= 30.0) & (df["diabetes"] == 1)
+    logit_hf = (
+        -3.9
+        + 0.04 * (df["edad"] - 50.0)
+        + 0.03 * (df["ap_hi"] - 120.0)
+        + 0.075 * (df["bmi"] - 25.0)
+        + 0.70 * df["diabetes"]
+        - 0.025 * (df["egfr"] - 75.0)
+        + 0.04 * df["delta_ap_hi"].fillna(0.0)
+        + 0.15 * df["delta_bmi"].fillna(0.0)
     )
-    df["target_insuficiencia_cardiaca"] = is_hf.astype(int)
+    p_hf = 1.0 / (1.0 + np.exp(-logit_hf))
+    y_hf = (rng.random(n) < p_hf).astype(int)
+    df["target_insuficiencia_cardiaca"] = y_hf
 
     # C) Fenotipo Cardiorrenal (KDIGO 2024 / Deterioro silente / Albuminuria):
-    is_ren = (
-        (df["delta_egfr"].fillna(0.0) <= -5.0) |
-        (df["uacr"] >= 30.0) |
-        (df["delta_uacr"].fillna(0.0) >= 8.0) |
-        (df["egfr"] < 60.0) |
-        ((df["diabetes"] == 1) & ((df["uacr"] >= 20.0) | (df["delta_egfr"].fillna(0.0) <= -3.0))) |
-        ((df["target_cardio"] == 1) & ((df["egfr"] < 75.0) | (df["uacr"] >= 25.0) | (df["delta_egfr"].fillna(0.0) <= -4.0)))
+    logit_cr = (
+        -3.2
+        - 0.045 * (df["egfr"] - 75.0)
+        + 0.022 * (df["uacr"] - 20.0)
+        - 0.22 * df["delta_egfr"].fillna(0.0)
+        + 0.035 * df["delta_uacr"].fillna(0.0)
+        + 0.75 * df["diabetes"]
+        + 0.018 * (df["ap_hi"] - 120.0)
     )
-    df["target_cardiorrenal"] = is_ren.astype(int)
+    p_cr = 1.0 / (1.0 + np.exp(-logit_cr))
+    y_cr = (rng.random(n) < p_cr).astype(int)
+    df["target_cardiorrenal"] = y_cr
+
+    # D) Target cardio global compuesto:
+    df["target_cardio"] = np.maximum(y_ath, np.maximum(y_hf, y_cr))
 
     return df[ALL_COLUMNS]
 

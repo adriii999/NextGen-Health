@@ -86,14 +86,13 @@ def _xgboost_classifier(positive_count: int, negative_count: int):
         ) from exc
 
     return XGBClassifier(
-        n_estimators=250,
+        n_estimators=180,
         max_depth=4,
         learning_rate=0.04,
         subsample=0.85,
         colsample_bytree=0.8,
         reg_alpha=0.1,
-        reg_lambda=1.5,
-        scale_pos_weight=negative_count / positive_count,
+        reg_lambda=2.0,
         objective="binary:logistic",
         eval_metric="logloss",
         tree_method="hist",
@@ -108,7 +107,7 @@ def _threshold_for_recall(y_true: np.ndarray, probabilities: np.ndarray) -> floa
     precision, recall, thresholds = precision_recall_curve(y_true, probabilities)
     qualifying = np.flatnonzero(recall[:-1] >= TARGET_RECALL)
     if len(qualifying) == 0:
-        return 0.5
+        return 0.10
     # Entre los umbrales que alcanzan recall, elegir el de mayor precisión.
     best = qualifying[np.argmax(precision[:-1][qualifying])]
     return float(thresholds[best])
