@@ -1,0 +1,15 @@
+{
+  "paciente_id": "paciente_05_dataset_real_riesgo_multiorganico",
+  "nombre": "Seguimiento 05 · Caso Dataset Real (Síndrome Cardiorrenal-Metabólico)",
+  "fecha_analitica": "2026-06-18",
+  "edad": 61.0,
+  "sexo": 1,
+  "bmi": 31.81,
+  "ap_hi": 164.6,
+  "ap_lo": 93.9,
+  "colesterol_total": 260.78,
+  "fuma": 1,
+  "diabetes": 1,
+  "egfr": 51.0,
+  "uacr": 88.3
+}

@@ -41,12 +41,31 @@ class EvaluationResponse(BaseModel):
     perfil_renal: Optional[PerfilRenalKDIGO] = Field(None, description="Estratificación renal detallada KDIGO 2024")
 
 
+class VisitaAnaliticaItem(BaseModel):
+    archivo: str = Field(..., description="Ruta relativa del archivo dentro de data/analiticas")
+    nombre_archivo: str = Field(..., description="Nombre del archivo de la visita")
+    fecha_analitica: Optional[str] = Field(None, description="Fecha clínica de la analítica")
+    tamano_bytes: int
+    fecha_modificacion: str
+    datos_resumen: Dict[str, Any] = Field(default_factory=dict)
+
+
 class AnaliticaItem(BaseModel):
     archivo: str
+    nombre: Optional[str] = None
+    es_carpeta: bool = False
+    num_analiticas: int = 1
     tamano_bytes: int
     fecha_modificacion: str
     tiene_progresion: bool
     datos_resumen: Dict[str, Any] = Field(default_factory=dict)
+    analiticas: List[VisitaAnaliticaItem] = Field(default_factory=list)
+
+
+class EvaluarAnaliticaRequest(BaseModel):
+    paciente_id: str = Field(..., description="Carpeta de paciente o archivo en data/analiticas")
+    modo: str = Field("B", description="'B' para seguimiento longitudinal completo, 'A' para analítica aislada")
+    analitica_archivo: Optional[str] = Field(None, description="Archivo específico dentro de la carpeta para Modo A")
 
 
 class AnaliticaEvaluadaItem(BaseModel):

@@ -56,8 +56,6 @@ p { line-height: 1.65; }
 .intake-action strong { font-size: 14px; }
 .intake-action p { font-size: 13px; margin-top: 5px; max-width: 650px; color: #526765; }
 .error-notice { background: #fff4f2; border: 1px solid #edc0b9; color: #8b302c; padding: 18px; margin-bottom: 22px; border-radius: 8px; display: flex; gap: 12px; font-size: 14px; }
-.demo-banner { display: flex; gap: 8px 16px; flex-wrap: wrap; background: #fff2d8; border: 1px solid #dbad54; color: #5b3a08; padding: 14px 18px; border-radius: 7px; margin: -12px 0 24px; font-size: 13px; }
-.demo-inline { display: inline-block; margin-left: 8px; padding: 4px 7px; border-radius: 4px; background: #fff2d8; color: #6a430a; font-size: 10px; vertical-align: middle; }
 .error-notice svg { flex-shrink: 0; }
 .review-layout { display: grid; grid-template-columns: minmax(260px, 330px) minmax(0, 1fr); gap: 24px; align-items: start; }
 .patient-sidebar > .section-heading { padding: 22px; }
@@ -115,6 +113,36 @@ select { width: 100%; min-height: 44px; border: 1px solid #bfcfc8; border-radius
 .recommendation small { font-size: 12px; color: #526765; }
 .app-footer { border-top: 1px solid #dbe4e1; padding: 24px 4%; font-size: 12px; color: #526765; }
 .mobile-back { display: none; }
+.heading-actions { display: flex; align-items: center; gap: 14px; flex-shrink: 0; align-self: flex-start; flex-wrap: wrap; }
+.status-pill { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid #bbcfc8; background: #edf5f1; color: #174f45; }
+.status-pill.pending { background: #fff4f2; border-color: #edc0b9; color: #8b302c; }
+.button.small { min-height: 36px; padding: 7px 12px; font-size: 12.5px; }
+.button.tiny { min-height: 30px; padding: 4px 10px; font-size: 12px; }
+.patient-folder-card { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
+.folder-main-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; width: 100%; }
+.folder-info { flex: 1; min-width: 220px; }
+.folder-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.visit-sublist { list-style: none; padding: 10px 14px; margin: 0 0 0 34px; background: #f8faf9; border: 1px solid #e2ebe6; border-radius: 7px; display: grid; gap: 8px; }
+.visit-subitem { display: flex !important; align-items: center !important; justify-content: space-between; gap: 10px; padding: 8px 0 !important; border-bottom: 1px dashed #dce6df !important; font-size: 12.5px; }
+.visit-subitem:last-child { border-bottom: 0 !important; padding-bottom: 0 !important; }
+.visit-subinfo { flex: 1; min-width: 0; }
+.visit-subinfo small { display: block; color: #526765; font-size: 11.5px; margin-top: 2px; }
+.batch-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+.result-badges { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mode-switcher { margin-top: 16px; padding: 14px; background: #f5f9f7; border: 1px solid #d6e5db; border-radius: 7px; }
+.mode-switcher-label { display: block; font-size: 12px; font-weight: 600; color: #244f47; margin-bottom: 8px; }
+.mode-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.kdigo-box { margin-top: 24px; padding: 18px 20px; background: #f8faf9; border: 1px solid #d6e5db; border-radius: 8px; }
+.kdigo-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.kdigo-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.kdigo-tag { font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 4px; background: #e3f2e9; color: #286242; }
+.kdigo-ALTO, .kdigo-MUY_ALTO, .kdigo-alert { background: #fbe9e7; color: #9a3931; }
+.kdigo-MODERADO { background: #fff1d6; color: #805515; }
+.visits-table-wrap { overflow-x: auto; margin-top: 14px; border: 1px solid #dce6df; border-radius: 6px; }
+.visits-table { width: 100%; border-collapse: collapse; font-size: 12.5px; text-align: left; }
+.visits-table th, .visits-table td { padding: 10px 12px; border-bottom: 1px solid #e6ece9; font-variant-numeric: tabular-nums; }
+.visits-table th { background: #f4f8f6; font-weight: 600; color: #244f47; }
+.visit-filename { display: block; font-size: 11px; color: #526765; }
 .skip-link { position: absolute; left: 16px; top: -80px; background: white; padding: 12px; z-index: 10; }
 .skip-link:focus { top: 12px; }
 @media (max-width: 760px) {

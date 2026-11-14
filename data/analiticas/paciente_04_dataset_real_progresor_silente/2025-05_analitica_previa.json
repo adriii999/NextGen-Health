@@ -1,0 +1,15 @@
+{
+  "paciente_id": "paciente_04_dataset_real_progresor_silente",
+  "nombre": "Seguimiento 04 · Caso Dataset Real (Progresor Rápido Renal)",
+  "fecha_analitica": "2025-05-12",
+  "edad": 51.0,
+  "sexo": 1,
+  "bmi": 26.81,
+  "ap_hi": 129.2,
+  "ap_lo": 82.0,
+  "colesterol_total": 162.33,
+  "fuma": 1,
+  "diabetes": 0,
+  "egfr": 80.5,
+  "uacr": 36.1
+}

@@ -1,4 +1,0 @@
-edad,sexo,bmi,ap_hi,ap_lo,colesterol_total,fuma,diabetes,egfr,uacr,delta_egfr,delta_uacr,delta_ap_hi
-45,1,23.5,120,78,185.0,0,0,98.0,10.0,-1.0,0.5,0.0
-67,2,30.2,162,95,245.0,1,1,52.0,85.0,-12.0,35.0,10.0
-55,1,26.0,132,82,210.0,0,1,70.0,32.0,-8.0,14.0,4.0

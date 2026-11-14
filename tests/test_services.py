@@ -185,3 +185,75 @@ def test_file_service_parses_json_and_csv(tmp_path):
     filenames = [item.archivo for item in items]
     assert "analitica_01.json" in filenames
     assert "analitica_02.csv" in filenames
+
+
+def test_file_service_patient_folders_modo_a_and_modo_b(tmp_path):
+    """
+    Verifica que FileService soporte carpetas de pacientes con múltiples analíticas
+    cronológicas y permita cargar tanto todo el seguimiento (Modo B con deltas calculados
+    entre T-1 y T) como una analítica aislada (Modo A con progresion=None).
+    """
+    pac_dir = tmp_path / "paciente_02_trampa"
+    pac_dir.mkdir()
+
+    visita_1 = {
+        "paciente_id": "paciente_02_trampa",
+        "nombre": "Paciente 02 Trampa",
+        "fecha_analitica": "2025-03-10",
+        "edad": 55,
+        "sexo": 1,
+        "bmi": 25.7,
+        "ap_hi": 120,
+        "ap_lo": 78,
+        "colesterol_total": 189.0,
+        "fuma": 0,
+        "diabetes": 1,
+        "egfr": 91.0,
+        "uacr": 6.0,
+    }
+    visita_2 = {
+        "paciente_id": "paciente_02_trampa",
+        "nombre": "Paciente 02 Trampa",
+        "fecha_analitica": "2026-03-10",
+        "edad": 56,
+        "sexo": 1,
+        "bmi": 26.5,
+        "ap_hi": 128,
+        "ap_lo": 82,
+        "colesterol_total": 195.0,
+        "fuma": 0,
+        "diabetes": 1,
+        "egfr": 82.0,
+        "uacr": 28.0,
+    }
+    (pac_dir / "2025-03_basal.json").write_text(json.dumps(visita_1), encoding="utf-8")
+    (pac_dir / "2026-03_control.json").write_text(json.dumps(visita_2), encoding="utf-8")
+
+    fs = FileService(base_dir=tmp_path)
+    items = fs.scan_folder()
+    assert len(items) == 1
+    folder_item = items[0]
+    assert folder_item.archivo == "paciente_02_trampa"
+    assert folder_item.es_carpeta is True
+    assert folder_item.num_analiticas == 2
+    assert folder_item.tiene_progresion is True
+    assert len(folder_item.analiticas) == 2
+
+    # Cargar en Modo B (Seguimiento completo -> calcula deltas entre 2025-03 y 2026-03)
+    _, lab_b, raw_b = fs.load_single_item("paciente_02_trampa", modo="B")
+    assert lab_b.progresion is not None
+    assert lab_b.progresion.delta_egfr == pytest.approx(-9.0)
+    assert lab_b.progresion.delta_uacr == pytest.approx(22.0)
+    assert lab_b.progresion.delta_ap_hi == pytest.approx(8.0)
+    assert lab_b.progresion.delta_colesterol == pytest.approx(6.0)
+    assert lab_b.progresion.delta_bmi == pytest.approx(0.8)
+    assert raw_b["modo_evaluacion"] == "MODO_B"
+
+    # Cargar en Modo A (Analítica sola -> progresion debe ser None)
+    _, lab_a, raw_a = fs.load_single_item(
+        "paciente_02_trampa", modo="A", analitica_archivo="2026-03_control.json"
+    )
+    assert lab_a.progresion is None
+    assert lab_a.egfr == pytest.approx(82.0)
+    assert raw_a["modo_evaluacion"] == "MODO_A"
+

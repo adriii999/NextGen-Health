@@ -266,3 +266,65 @@ def test_api_predict_casos_reales_extraidos_del_dataset(http_client: httpx.Clien
     assert data_trampa["nivel_prioridad"] == "ALTA"
     assert data_trampa["perfil_renal"]["progresor_rapido"] is True
     assert len(data_trampa["factores_clave"]) > 0
+
+
+# ==============================================================================
+# 4. PRUEBAS DE CARPETAS DE PACIENTES EN /api/analiticas (MODO A Y MODO B)
+# ==============================================================================
+
+def test_api_analiticas_carpetas_pacientes_modo_a_y_modo_b(http_client: httpx.Client):
+    """
+    Verifica que GET /api/analiticas devuelva las carpetas de seguimiento de pacientes
+    con sus analíticas individuales, y que POST /api/analiticas/evaluar permita
+    ejecutar tanto el seguimiento completo (Modo B) como una analítica aislada (Modo A).
+    """
+    res_list = http_client.get("/api/analiticas")
+    assert res_list.status_code == 200
+    carpetas = res_list.json()
+    assert len(carpetas) >= 4
+
+    # Buscar la carpeta del paciente con deterioro silente ("Trampa del Rango Normal")
+    trampa_folder = next(
+        (c for c in carpetas if "trampa" in c["archivo"].lower()),
+        None,
+    )
+    assert trampa_folder is not None, "Debe existir la carpeta de seguimiento de trampa del rango normal"
+    assert trampa_folder["es_carpeta"] is True
+    assert trampa_folder["num_analiticas"] >= 2
+    assert trampa_folder["tiene_progresion"] is True
+    assert len(trampa_folder["analiticas"]) >= 2
+
+    paciente_id = trampa_folder["archivo"]
+    ultima_visita = trampa_folder["analiticas"][-1]["nombre_archivo"]
+
+    # 1. Evaluar en Modo A (Analítica sola / aislada sin deltas históricos)
+    res_modo_a = http_client.post(
+        "/api/analiticas/evaluar",
+        json={
+            "paciente_id": paciente_id,
+            "modo": "A",
+            "analitica_archivo": ultima_visita,
+        },
+    )
+    assert res_modo_a.status_code == 200
+    item_a = res_modo_a.json()
+    assert item_a["datos_entrada"]["modo_evaluacion"] == "MODO_A"
+    assert item_a["datos_entrada"]["progresion"] is None
+    assert item_a["evaluacion"]["perfil_renal"]["progresor_rapido"] is False
+
+    # 2. Evaluar en Modo B (Seguimiento longitudinal completo de la carpeta)
+    res_modo_b = http_client.post(
+        "/api/analiticas/evaluar",
+        json={
+            "paciente_id": paciente_id,
+            "modo": "B",
+        },
+    )
+    assert res_modo_b.status_code == 200
+    item_b = res_modo_b.json()
+    assert item_b["datos_entrada"]["modo_evaluacion"] == "MODO_B"
+    assert item_b["datos_entrada"]["progresion"] is not None
+    assert item_b["evaluacion"]["hay_riesgo"] is True
+    assert item_b["evaluacion"]["nivel_prioridad"] == "ALTA"
+    assert item_b["evaluacion"]["perfil_renal"]["progresor_rapido"] is True
+

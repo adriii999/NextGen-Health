@@ -1,0 +1,15 @@
+{
+  "paciente_id": "paciente_03_alto_riesgo_franco",
+  "nombre": "Seguimiento 03 · Alto Riesgo Aterosclerótico y Cardiorrenal",
+  "fecha_analitica": "2026-01-20",
+  "edad": 65.0,
+  "sexo": 2,
+  "bmi": 32.0,
+  "ap_hi": 165.0,
+  "ap_lo": 98.0,
+  "colesterol_total": 260.0,
+  "fuma": 1,
+  "diabetes": 1,
+  "egfr": 50.0,
+  "uacr": 95.0
+}

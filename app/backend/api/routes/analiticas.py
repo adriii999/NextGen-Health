@@ -1,6 +1,10 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
-from app.backend.schemas.response import AnaliticaItem, AnaliticaEvaluadaItem
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from app.backend.schemas.response import (
+    AnaliticaItem,
+    AnaliticaEvaluadaItem,
+    EvaluarAnaliticaRequest,
+)
 from app.backend.services.file_service import FileService
 from app.backend.services.model_service import ModelService, ModelNotImplementedError
 from app.backend.api.deps import get_file_service, get_model_service
@@ -11,8 +15,76 @@ router = APIRouter(prefix="/analiticas", tags=["Analíticas de Carpeta"])
 
 @router.get("", response_model=List[AnaliticaItem], status_code=status.HTTP_200_OK)
 def list_analiticas(file_service: FileService = Depends(get_file_service)):
-    """Lista las analíticas encontradas en la carpeta de datos (totalmente implementado e independiente del modelo)."""
+    """Lista las carpetas de seguimiento de pacientes y analíticas en data/analiticas/."""
     return file_service.scan_folder()
+
+
+@router.post(
+    "/evaluar",
+    response_model=AnaliticaEvaluadaItem,
+    status_code=status.HTTP_200_OK,
+    responses={
+        501: {
+            "description": "Modelo de Machine Learning pendiente de entrenamiento o no encontrado.",
+        },
+        404: {
+            "description": "Paciente o analítica no encontrada en data/analiticas/.",
+        },
+    },
+)
+def evaluate_single_patient_or_lab(
+    request: EvaluarAnaliticaRequest,
+    file_service: FileService = Depends(get_file_service),
+    model_service: ModelService = Depends(get_model_service),
+):
+    """
+    Evalúa un seguimiento de paciente completo (Modo B, calculando la progresión entre visitas)
+    o una analítica individual aislada (Modo A, sin historial de progresión).
+    """
+    if not model_service.is_model_loaded():
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail={
+                "error": "MODELO_NO_IMPLEMENTADO",
+                "mensaje": f"No se puede evaluar la analítica porque el modelo de ML no se encuentra en '{settings.MODEL_PATH}'.",
+                "estado": "PENDIENTE_ENTRENAMIENTO",
+                "artefacto_esperado": str(settings.MODEL_PATH),
+            },
+        )
+
+    parsed = file_service.load_single_item(
+        paciente_id=request.paciente_id,
+        modo=request.modo,
+        analitica_archivo=request.analitica_archivo,
+    )
+    if parsed is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró el seguimiento o analítica '{request.paciente_id}' en '{settings.ANALITICAS_DIR}'.",
+        )
+
+    filename, lab_input, raw_data = parsed
+    try:
+        evaluation = model_service.evaluate(lab_input)
+        return AnaliticaEvaluadaItem(
+            archivo=filename,
+            evaluacion=evaluation,
+            datos_entrada=raw_data,
+        )
+    except ModelNotImplementedError as e:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail={
+                "error": "MODELO_NO_IMPLEMENTADO",
+                "mensaje": str(e),
+                "estado": "PENDIENTE_ENTRENAMIENTO",
+            },
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al evaluar '{request.paciente_id}': {str(e)}",
+        )
 
 
 @router.post(
@@ -26,13 +98,15 @@ def list_analiticas(file_service: FileService = Depends(get_file_service)):
     },
 )
 def analyze_folder_analiticas(
+    modo: Optional[str] = Query("B", description="'B' para seguimiento completo, 'A' para analítica aislada"),
     file_service: FileService = Depends(get_file_service),
     model_service: ModelService = Depends(get_model_service),
 ):
     """
     Flujo principal en 1 Clic:
-    Carga todas las analíticas de la carpeta y ejecuta la evaluación clínica.
-    Si el artefacto del modelo no se encuentra en disco, devuelve HTTP 501 Not Implemented.
+    Carga todas las carpetas de pacientes en data/analiticas/ y ejecuta la evaluación clínica
+    (por defecto en Modo B de seguimiento longitudinal si existen >=2 analíticas por paciente,
+    o Modo A si se solicita modo='A' o el paciente tiene una única analítica).
     """
     if not model_service.is_model_loaded():
         raise HTTPException(
@@ -46,7 +120,7 @@ def analyze_folder_analiticas(
         )
 
     try:
-        items = file_service.load_all_analiticas()
+        items = file_service.load_all_analiticas(modo=modo or "B")
         if not items:
             return []
 
