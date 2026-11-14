@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { Activity } from 'lucide-react';
 import { DashboardPage } from './pages/DashboardPage';
-import { SimulatorPage } from './pages/SimulatorPage';
 import { IngestPage } from './pages/IngestPage';
 
 export function App() {
@@ -39,7 +38,6 @@ export function App() {
             <nav className="flex items-center h-full gap-7" role="tablist">
               {[
                 { id: 'dashboard', label: 'Dashboard de Cupo' },
-                { id: 'simulator', label: 'Simulador Clínico' },
                 { id: 'ingest', label: 'Buzón de Analíticas' },
               ].map((tab) => {
                 const isActive = activeTab === tab.id;
@@ -81,7 +79,6 @@ export function App() {
       {/* Contenido Principal */}
       <main className="flex-1 max-w-[1280px] w-full mx-auto px-6 py-6">
         {activeTab === 'dashboard' && <DashboardPage />}
-        {activeTab === 'simulator' && <SimulatorPage />}
         {activeTab === 'ingest' && <IngestPage />}
       </main>
 
