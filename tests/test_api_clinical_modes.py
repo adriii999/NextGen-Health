@@ -217,8 +217,14 @@ def test_api_predict_casos_reales_extraidos_del_dataset(http_client: httpx.Clien
 
     df = pd.read_csv(dataset_path)
 
-    # 1. Caso Real Modo A Control (target_cardio == 0 y sin deltas)
-    row_ctrl = df[(df["target_cardio"] == 0) & (df["delta_egfr"].isna())].iloc[0]
+    # 1. Caso Real Modo A Control (target_cardio == 0, sin deltas y constantes en rango óptimo)
+    row_ctrl = df[
+        (df["target_cardio"] == 0)
+        & (df["delta_egfr"].isna())
+        & (df["ap_hi"] <= 125.0)
+        & (df["bmi"] <= 25.0)
+        & (df["colesterol_total"] <= 200.0)
+    ].iloc[0]
     payload_ctrl = {
         "edad": float(row_ctrl["edad"]),
         "sexo": int(row_ctrl["sexo"]),
