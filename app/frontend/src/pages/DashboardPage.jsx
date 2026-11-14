@@ -17,6 +17,13 @@ export const DashboardPage = () => {
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null);
 
+  // Escuchar evento global para abrir menú de comandos desde el botón del header
+  React.useEffect(() => {
+    const handleOpen = () => setIsCommandMenuOpen(true);
+    window.addEventListener('open-command-menu', handleOpen);
+    return () => window.removeEventListener('open-command-menu', handleOpen);
+  }, []);
+
   // Análisis en 1 Clic con simulación de progreso
   const handleAnalyzeFolder = async () => {
     setLoading(true);
