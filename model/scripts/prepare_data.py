@@ -18,7 +18,8 @@ PROCESSED_DIR = BASE_DIR / "data" / "processed"
 NUTRISYNTHCARE_FILE = RAW_DIR / "nutrisynthcare" / "db_cardiabetes.csv"
 KAGGLE_CVD_FILE = RAW_DIR / "cardio_train.csv"
 NHANES_DIR = RAW_DIR / "nhanes"
-OUTPUT_FILE = PROCESSED_DIR / "dataset_preprocessed.csv"
+OUTPUT_FILE = PROCESSED_DIR / "dataset.csv"
+RAW_OUTPUT_FILE = RAW_DIR / "dataset.csv"
 
 # 15 características requeridas por el modelo y la arquitectura
 ORDERED_FEATURES = [
@@ -58,6 +59,9 @@ def filter_physiological_outliers(df: pd.DataFrame) -> pd.DataFrame:
 
     if "edad" in df.columns:
         mask = mask & (df["edad"] >= 30.0) & (df["edad"] <= 85.0)
+
+    if "colesterol_total" in df.columns:
+        mask = mask & (df["colesterol_total"] >= 80.0) & (df["colesterol_total"] <= 450.0)
 
     cleaned = df[mask].copy().reset_index(drop=True)
     dropped = initial_len - len(cleaned)
@@ -414,7 +418,10 @@ def run_data_preparation(output_path: Optional[Path] = None, random_seed: int = 
 
     # 3. Guardar archivo
     final_df.to_csv(target_out, index=False)
-    print(f"\n[OK] Dataset preprocesado guardado en: {target_out}")
+    print(f"\n[OK] Dataset guardado en: {target_out}")
+    if target_out == OUTPUT_FILE and RAW_OUTPUT_FILE.parent.exists():
+        final_df.to_csv(RAW_OUTPUT_FILE, index=False)
+        print(f"[OK] Reemplazado placeholder en data/raw/: {RAW_OUTPUT_FILE}")
     print(f"Dimensiones finales: {final_df.shape[0]} filas x {final_df.shape[1]} columnas.")
     print(f"Balance de target (0 / 1):\n{final_df[TARGET_COLUMN].value_counts(normalize=True).to_dict()}")
     print(f"Porcentaje de nulos en deltas: {final_df['delta_egfr'].isnull().mean() * 100:.1f}% (Modo A simulado).")
