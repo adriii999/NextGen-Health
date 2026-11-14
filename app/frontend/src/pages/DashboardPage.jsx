@@ -1,125 +1,234 @@
 import { useEffect, useRef, useState } from 'react';
 import { analiticasService, analysisError } from '../services/analiticasService';
 import { PatientResults } from '../components/folderView/PatientResults';
+import { PriorityInbox } from '../components/folderView/PriorityInbox';
+import { PatientQuickNav } from '../components/folderView/PatientQuickNav';
+import { IncompletePatientDetail } from '../components/folderView/IncompletePatientDetail';
 import { PatientEvolutionChart } from '../components/charts/PatientEvolutionChart';
 import { UploadPatientPage } from './UploadPatientPage';
+import { patientDisplayName } from '../services/patientDisplayName';
+
+function attachHistory(patient, sources) {
+  const source = sources.find((item) => item.archivo === patient.paciente_id);
+  const visits = patient.historial_visitas.length ? patient.historial_visitas : [{
+    nombre_archivo: patient.analitica_evaluada,
+    fecha_analitica: patient.datos_entrada.fecha_analitica,
+    ...patient.datos_entrada,
+  }];
+  return {
+    ...patient,
+    analiticas: visits.map((visit) => ({
+      nombre_archivo: visit.nombre_archivo,
+      fecha_analitica: visit.fecha_analitica,
+      datos_resumen: {
+        ...source?.analiticas?.find((item) => item.nombre_archivo === visit.nombre_archivo)?.datos_resumen,
+        ...visit,
+      },
+    })),
+  };
+}
 
 export function DashboardPage() {
+  const [sources, setSources] = useState([]);
   const [patients, setPatients] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [result, setResult] = useState(null);
   const [search, setSearch] = useState('');
+  const [priority, setPriority] = useState('');
   const [busy, setBusy] = useState('load');
   const [error, setError] = useState('');
+  const [failedAction, setFailedAction] = useState('');
+  const [analyzedAt, setAnalyzedAt] = useState(null);
   const [upload, setUpload] = useState(false);
+  const [sourceStatus, setSourceStatus] = useState('');
   const requestId = useRef(0);
+  const lastOpened = useRef(null);
+  const detailHeading = useRef(null);
+  const initialAnalysisStarted = useRef(false);
+  const analyzedVersion = useRef(null);
 
-  async function loadPatients() {
+  async function loadSources() {
     const id = ++requestId.current;
     setBusy('load');
     setError('');
-    setSelected(null);
-    setResult(null);
+    setFailedAction('');
     try {
       const response = await analiticasService.getArchivosAnaliticas();
-      if (id === requestId.current) setPatients(response.archivos.filter((item) => item.es_carpeta));
+      if (id === requestId.current) setSources(response.archivos);
     } catch (err) {
-      if (id === requestId.current) setError(analysisError(err));
+      if (id === requestId.current) {
+        setError(analysisError(err));
+        setFailedAction('load');
+      }
     } finally {
       if (id === requestId.current) setBusy('');
     }
   }
 
   useEffect(() => {
-    loadPatients();
-    return () => { requestId.current += 1; };
+    if (initialAnalysisStarted.current) return;
+    initialAnalysisStarted.current = true;
+    analyzeCupo();
   }, []);
 
-  async function selectPatient(patient) {
+  useEffect(() => {
+    if (!analyzedAt) return;
+    let cancelled = false;
+    async function checkSources() {
+      try {
+        const version = await analiticasService.getVersionFuentes();
+        if (!cancelled) setSourceStatus(version === analyzedVersion.current ? '' : 'changed');
+      } catch {
+        if (!cancelled) setSourceStatus('unknown');
+      }
+    }
+    window.addEventListener('focus', checkSources);
+    const timer = window.setInterval(checkSources, 60000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', checkSources);
+      window.clearInterval(timer);
+    };
+  }, [analyzedAt]);
+
+  useEffect(() => {
+    if (selected) detailHeading.current?.focus();
+    else if (!upload && lastOpened.current) {
+      document.getElementById(`review-${lastOpened.current}`)?.focus();
+    }
+  }, [selected, upload]);
+
+  async function analyzeCupo() {
     const id = ++requestId.current;
-    setSelected(patient);
-    setResult(null);
+    setBusy('analyze');
     setError('');
-    setBusy('evaluate');
+    setFailedAction('');
+    setSelected(null);
+    setSourceStatus('');
+    lastOpened.current = null;
     try {
-      const evaluation = await analiticasService.evaluarSeleccion(
-        patient.archivo, patient.analiticas.map((visit) => visit.nombre_archivo));
-      // Una respuesta tardía nunca debe sustituir al paciente abierto después.
-      if (id === requestId.current) setResult(evaluation);
+      const before = await analiticasService.getVersionFuentes();
+      const inventory = await analiticasService.getArchivosAnaliticas();
+      if (id !== requestId.current) return;
+      setSources(inventory.archivos);
+      if (inventory.archivos.length === 0) {
+        setPatients([]);
+        setAnalyzedAt(null);
+        return;
+      }
+      const analysis = await analiticasService.analizarCarpeta('B');
+      const after = await analiticasService.getVersionFuentes();
+      if (id !== requestId.current) return;
+      analyzedVersion.current = before;
+      setSourceStatus(before === after ? '' : 'changed');
+      setPatients(analysis.pacientes.map((patient) => attachHistory(patient, inventory.archivos)));
+      setAnalyzedAt(new Date());
     } catch (err) {
-      if (id === requestId.current) setError(analysisError(err));
+      if (id === requestId.current) {
+        setPatients([]);
+        setAnalyzedAt(null);
+        analyzedVersion.current = null;
+        setError(analysisError(err));
+        setFailedAction('analyze');
+      }
     } finally {
       if (id === requestId.current) setBusy('');
     }
   }
 
-  const filtered = patients.filter((patient) =>
-    `${patient.nombre} ${patient.archivo}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+  function selectPatient(patient) {
+    lastOpened.current = patient.id;
+    setSelected(patient);
+  }
 
   if (upload) return <>
-    <div className="consultation-back"><button className="button secondary" onClick={() => setUpload(false)}>Volver a la consulta</button></div>
+    <div className="consultation-back"><button className="button secondary" onClick={() => setUpload(false)}>Volver al cupo</button></div>
     <UploadPatientPage />
   </>;
+
+  if (selected) return (
+    <div className="workspace">
+      {sourceStatus && <p role="status" className="consultation-demo">
+        {sourceStatus === 'changed' ? 'Hay cambios en las analíticas. Vuelve a la lista y revisa de nuevo.' : 'No se pudo comprobar si las analíticas han cambiado.'}
+      </p>}
+      <div className="page-heading patient-page-heading">
+        <div>
+          <p className="eyebrow">Revisión individual</p>
+          <h1 ref={detailHeading} tabIndex={-1}>{patientDisplayName(selected)}</h1>
+          <p>Evaluado {analyzedAt.toLocaleString('es-ES')}</p>
+        </div>
+        <button className="button secondary detail-back" onClick={() => setSelected(null)}>Volver a la lista de pacientes</button>
+      </div>
+      <div className="patient-detail-layout">
+        <PatientQuickNav patients={patients} selected={selected} onSelect={selectPatient} />
+        <div className="patient-detail-content">
+          {selected.estado === 'EVALUADA' ? <>
+            <section className="surface results-panel" aria-label="Resultado del paciente">
+              <PatientResults patient={selected} busy={busy} showHistory={false} showPatientHeading={false} />
+            </section>
+            <details className="patient-history-disclosure">
+              <summary>Ver evolución · {selected.historial_visitas.length || 1} analíticas</summary>
+              <PatientEvolutionChart key={selected.id} patient={{ ...selected, nombre: patientDisplayName(selected) }} />
+            </details>
+          </> : <IncompletePatientDetail patient={selected} />}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="workspace">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Consulta</p>
-          <h1>Revisar un paciente</h1>
-          <p>Abre su ficha para consultar la evolución de sus analíticas y la valoración actual de riesgos.</p>
+          <p className="eyebrow">Atención Primaria · <span>Prototipo experimental</span></p>
+          <h1>Pacientes por revisar</h1>
         </div>
-        <button className="button secondary" disabled={busy === 'load'} onClick={() => setUpload(true)}>Cargar archivos externos</button>
-      </div>
-      <p className="consultation-demo" role="note">Entorno de demostración: los pacientes precargados son casos de prueba. Las evaluaciones se calculan con el modelo.</p>
-      {error && !selected && <div role="alert" className="error-notice upload-error"><p>{error}</p></div>}
-      <div className="consultation-layout">
-        <aside className="surface patient-sidebar" aria-label="Pacientes de consulta">
-          <div className="section-heading"><h2>Pacientes</h2>
-            <button className="button secondary small" disabled={busy === 'load'} onClick={loadPatients}>Actualizar</button>
-          </div>
-          <div className="patient-filters">
-            <label htmlFor="consultation-search">Buscar paciente</label>
-            <div className="search-field"><input id="consultation-search" placeholder="Nombre o identificador"
-              value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-          </div>
-          {busy === 'load' ? <p className="list-empty" role="status">Cargando pacientes…</p>
-            : <ul className="patient-list">{filtered.map((patient) => (
-              <li key={patient.archivo}><button onClick={() => selectPatient(patient)}
-                className={selected?.archivo === patient.archivo ? 'selected' : ''}
-                aria-pressed={selected?.archivo === patient.archivo}>
-                <strong>{patient.nombre || patient.archivo}</strong>
-                <span className="patient-meta">{patient.datos_resumen?.edad ?? 'Edad no disponible'} años · {patient.num_analiticas} analíticas</span>
-              </button></li>
-            ))}</ul>}
-          {busy !== 'load' && !filtered.length && <p className="list-empty">
-            {patients.length ? 'No hay pacientes con esa búsqueda.' : 'No hay pacientes disponibles. Puedes actualizar o cargar archivos externos.'}
-          </p>}
-        </aside>
-
-        <div className="consultation-main">
-          {selected ? <>
-            <PatientEvolutionChart key={selected.archivo} patient={selected} />
-            <div className="current-risk-heading">
-              <h2>Valoración actual de riesgos</h2>
-              <p>Basada en la última analítica y, si hay historial, en la evolución entre las dos últimas visitas.
-                Estos riesgos corresponden a la valoración actual, no a cada punto del gráfico.</p>
+        <div className="inbox-actions">
+          <button className="button primary" disabled={!!busy || (!sources.length && !analyzedAt) || !!failedAction}
+            onClick={analyzeCupo}>
+            {busy === 'analyze' ? 'Revisando analíticas…' : 'Revisar de nuevo'}
+          </button>
+          <details className="review-tools">
+            <summary>Más opciones</summary>
+            <div className="review-tools-content">
+              <p>Revisa las analíticas de un paciente que no está en la lista.</p>
+              <button className="button secondary" disabled={!!busy} onClick={() => setUpload(true)}>Cargar archivos externos</button>
             </div>
-            {busy === 'evaluate' && <div className="surface upload-panel" role="status" aria-live="polite">
-              Calculando los riesgos de {selected.nombre} con sus analíticas…
-            </div>}
-            {error && <div role="alert" className="error-notice upload-error">
-              <div><p>{error}</p><button className="button secondary" onClick={() => selectPatient(selected)}>Reintentar valoración</button></div>
-            </div>}
-            {result && <section className="surface results-panel" aria-label="Resultado del paciente">
-              <PatientResults patient={result} busy={busy} showHistory={false} />
-            </section>}
-          </> : <section className="surface empty-state selection-empty">
-            <h2>Selecciona al paciente de la consulta</h2>
-            <p>Verás automáticamente su evolución y sus riesgos actuales. Podrás consultar cada analítica por fecha.</p>
-          </section>}
+          </details>
         </div>
       </div>
+
+      {sourceStatus && <p role="status" className="consultation-demo">
+        {sourceStatus === 'changed' ? 'Hay cambios en las analíticas. Revisa el cupo de nuevo.' : 'No se pudo comprobar si las analíticas han cambiado.'}
+      </p>}
+
+      {error && <div role="alert" className="error-notice upload-error">
+        <div>
+          <p>{error}</p>
+          <button className="button secondary" onClick={failedAction === 'load' ? loadSources : analyzeCupo}>
+            {failedAction === 'load' ? 'Reintentar carga' : 'Reintentar análisis'}
+          </button>
+        </div>
+      </div>}
+
+      {busy && analyzedAt && <p role="status" aria-live="polite" className="consultation-demo">
+        Actualizando la lista. Los resultados visibles corresponden a la revisión anterior.
+      </p>}
+      {busy && !analyzedAt ? <section className="surface empty-state" role="status" aria-live="polite">
+        <h2>{busy === 'analyze' ? 'Revisando las analíticas' : 'Cargando fuentes de analíticas'}</h2>
+        <p>{busy === 'analyze'
+          ? 'Buscando datos que ayuden a ordenar el cupo. Puede tardar unos instantes.'
+          : 'Consultando los archivos disponibles en el servidor.'}</p>
+      </section> : analyzedAt ? <PriorityInbox
+        patients={patients} analyzedAt={analyzedAt} search={search} priority={priority}
+        onSearch={setSearch} onPriority={setPriority} onSelect={selectPatient} busy={!!busy}
+      /> : !error && <section className="surface empty-state">
+        <h2>{sources.length ? 'El cupo está pendiente de análisis' : 'La carpeta del servidor está vacía'}</h2>
+        <p>{sources.length
+          ? `${sources.length} fuentes de analíticas disponibles.`
+          : 'No hay fuentes de analíticas disponibles en la carpeta del servidor.'}</p>
+        <p>La carga externa permite revisar un paciente por separado; no lo incorpora al cupo del servidor.</p>
+        <button className="button secondary" onClick={loadSources}>Actualizar fuentes</button>
+      </section>}
     </div>
   );
 }

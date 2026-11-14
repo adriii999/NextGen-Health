@@ -161,6 +161,9 @@ class ModelService:
         hay_riesgo = ath_alert or hf_alert or ren_alert
 
         perfil_renal = self._compute_kdigo_profile(features)
+        motivos_prioridad = self._priority_reasons(
+            ath_alert, hf_alert, ren_alert, features, probs, perfil_renal
+        )
 
         # Explicar con TreeSHAP real: si hay alertas activas, priorizar los modelos en alerta;
         # si no hay alertas (paciente bajo control), ejecutar TreeSHAP sobre los 3 modelos para
@@ -202,17 +205,18 @@ class ModelService:
         )[:3]
 
         if not hay_riesgo:
+            high_review = bool(set(motivos_prioridad) & {
+                "DESCENSO_RAPIDO", "RIESGO_RENAL_ALTO", "PRESION_ALTA",
+            })
             return EvaluationResponse(
                 hay_riesgo=False,
-                conclusion_diagnostica=(
-                    "Sin riesgo cardiovascular significativo detectado. "
-                    "Todos los fenotipos se encuentran dentro de los límites de seguridad."
-                ),
-                nivel_prioridad="BAJA",
+                conclusion_diagnostica="El modelo experimental no ha generado alertas. Esto no descarta riesgo.",
+                nivel_prioridad="ALTA" if high_review else "BAJA",
+                motivos_prioridad=motivos_prioridad,
                 tipos_riesgo=tipos_riesgo,
                 factores_clave=factores_clave,
                 recomendacion_preventiva=(
-                    "Continuar con controles habituales de Atención Primaria según protocolo general."
+                    "Revisar los datos y la historia clínica según el criterio profesional."
                 ),
                 perfil_renal=perfil_renal,
             )
@@ -225,6 +229,7 @@ class ModelService:
             hay_riesgo=True,
             conclusion_diagnostica=conclusion,
             nivel_prioridad=prioridad,
+            motivos_prioridad=motivos_prioridad,
             tipos_riesgo=tipos_riesgo,
             factores_clave=factores_clave,
             recomendacion_preventiva=recomendacion,
@@ -249,7 +254,29 @@ class ModelService:
             return f"Alto ({pct}%, umbral alerta: {int(umbral*100)}%)"
         if val >= umbral:
             return f"Moderado-Alto ({pct}%)"
-        return f"Bajo control ({pct}%)"
+        return f"Por debajo del umbral del modelo ({pct}%)"
+
+    def _priority_reasons(self, ath_alert, hf_alert, ren_alert, features, probs, perfil_renal):
+        reasons = [] if (ath_alert or hf_alert or ren_alert) else ["SIN_ALERTAS"]
+        for active, reason in (
+            (ath_alert, "ALERTA_CIRCULACION"),
+            (hf_alert, "ALERTA_CORAZON"),
+            (ren_alert, "ALERTA_RINON_CORAZON"),
+        ):
+            if active:
+                reasons.append(reason)
+        delta = features.get("delta_egfr")
+        if delta is not None and not np.isnan(delta) and delta <= -5.0:
+            reasons.append("DESCENSO_RAPIDO")
+        if perfil_renal is not None and perfil_renal.cuadrante_kdigo in ("ALTO", "MUY_ALTO"):
+            reasons.append("RIESGO_RENAL_ALTO")
+        if float(features.get("ap_hi", 120.0)) >= 165.0 or float(features.get("ap_lo", 80.0)) >= 100.0:
+            reasons.append("PRESION_ALTA")
+        if probs and max(probs.values()) >= 0.45:
+            reasons.append("PUNTUACION_ALTA")
+        if ath_alert and hf_alert and ren_alert:
+            reasons.append("TRES_ALERTAS")
+        return reasons
 
     def _synthesize_verdict(
         self,
@@ -260,7 +287,6 @@ class ModelService:
         probs: Optional[Dict[str, float]] = None,
         perfil_renal: Optional[PerfilRenalKDIGO] = None,
     ) -> tuple[str, str, str]:
-        recs = []
         conclusions = []
         prioridad = "MEDIA"
 
@@ -268,37 +294,29 @@ class ModelService:
             delta_egfr = features.get("delta_egfr")
             if delta_egfr is not None and not np.isnan(delta_egfr) and delta_egfr <= -5.0:
                 conclusions.append(
-                    f"Deterioro cardiorrenal silente acelerado (pérdida de eGFR de {delta_egfr:.1f} mL/min/año)"
+                    "alerta en la evaluación del riñón y el corazón"
                 )
                 prioridad = "ALTA"
             else:
-                conclusions.append("Compromiso cardiorrenal activo (función renal/albuminuria)")
-            recs.append(
-                "Confirmar cociente UACR en 3 meses y valorar optimización de nefroprotección (iSGLT2 / ARA-II)."
-            )
+                conclusions.append("alerta en la evaluación del riñón y el corazón")
 
         if hf_alert:
-            conclusions.append("Sobrecarga hemodinámica con riesgo de insuficiencia cardíaca")
-            recs.append("Solicitar analítica con NT-proBNP y control de peso/tensión.")
+            conclusions.append("alerta en la evaluación de insuficiencia cardíaca")
 
         if ath_alert:
-            conclusions.append("Riesgo aterosclerótico aumentado (ASCVD)")
-            recs.append("Optimizar control lipídico hacia c-LDL objetivo y deshabituación tabáquica si procede.")
+            conclusions.append("alerta en la evaluación de la circulación")
 
         # Criterios clínicos de Atención Primaria para triaje de Prioridad ALTA en Modo A y Modo B:
-        max_prob = max(probs.values()) if probs else 0.0
-        kdigo_severe = perfil_renal is not None and perfil_renal.cuadrante_kdigo in ("ALTO", "MUY_ALTO")
-        hta_severa = float(features.get("ap_hi", 120.0)) >= 165.0 or float(features.get("ap_lo", 80.0)) >= 100.0
-        triple_alerta = ath_alert and hf_alert and ren_alert
-        if kdigo_severe or max_prob >= 0.45 or triple_alerta or hta_severa:
+        reasons = self._priority_reasons(ath_alert, hf_alert, ren_alert, features, probs, perfil_renal)
+        if set(reasons) & {"DESCENSO_RAPIDO", "RIESGO_RENAL_ALTO", "PRESION_ALTA", "PUNTUACION_ALTA", "TRES_ALERTAS"}:
             prioridad = "ALTA"
 
         conclusion_txt = (
-            f"Alerta de riesgo detectada: {', '.join(conclusions)}."
+            f"Modelo experimental: {', '.join(conclusions)}. No es un diagnóstico."
             if conclusions
             else "Riesgo cardiovascular aumentado."
         )
-        recomendacion_txt = " ".join(recs)
+        recomendacion_txt = "Revisar los datos y la historia clínica según el criterio profesional."
 
         return conclusion_txt, recomendacion_txt, prioridad
 

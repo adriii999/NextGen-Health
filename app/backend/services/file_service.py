@@ -1,17 +1,55 @@
 import json
 import csv
+import hashlib
 from pathlib import Path
 from datetime import datetime
 from typing import List, Tuple, Dict, Any, Optional
+from dataclasses import dataclass, field
+from pydantic import ValidationError
 
 from app.backend.schemas.clinical import LabInput, ProgressionDelta
 from app.backend.schemas.response import AnaliticaItem, VisitaAnaliticaItem
 from app.backend.config import settings
 
 
+REQUIRED_CLINICAL_FIELDS = [
+    "edad", "sexo", "bmi", "ap_hi", "ap_lo", "colesterol_total",
+    "fuma", "diabetes", "egfr", "uacr",
+]
+
+
+@dataclass
+class AnaliticaCupo:
+    archivo: str
+    lab_input: Optional[LabInput]
+    datos_entrada: Dict[str, Any]
+    estado: str
+    campos_pendientes: List[str] = field(default_factory=list)
+    errores_datos: List[str] = field(default_factory=list)
+
+
 class FileService:
     def __init__(self, base_dir: Optional[Path] = None):
         self.base_dir = Path(base_dir or settings.ANALITICAS_DIR)
+
+    def source_fingerprint(self) -> str:
+        digest = hashlib.sha256()
+        if not self.base_dir.is_dir():
+            return digest.hexdigest()
+        for entry in sorted(self.base_dir.iterdir()):
+            if entry.name.startswith("."):
+                continue
+            paths = sorted(entry.iterdir()) if entry.is_dir() else [entry]
+            for path in paths:
+                if not path.is_file() or path.suffix.lower() not in ({".json"} if entry.is_dir() else {".json", ".csv"}):
+                    continue
+                name = path.relative_to(self.base_dir).as_posix().encode("utf-8")
+                content = path.read_bytes()
+                digest.update(len(name).to_bytes(8, "big"))
+                digest.update(name)
+                digest.update(len(content).to_bytes(8, "big"))
+                digest.update(content)
+        return digest.hexdigest()
 
     def scan_folder(self) -> List[AnaliticaItem]:
         """
@@ -195,50 +233,135 @@ class FileService:
                 except ValueError:
                     continue
 
-        return {
-            "delta_egfr": round((float(curr_v["egfr"]) - float(prev_v["egfr"])) / years_factor, 2),
-            "delta_uacr": round((float(curr_v["uacr"]) - float(prev_v["uacr"])) / years_factor, 2),
-            "delta_ap_hi": round((float(curr_v["ap_hi"]) - float(prev_v["ap_hi"])) / years_factor, 2),
-            "delta_colesterol": round((float(curr_v["colesterol_total"]) - float(prev_v["colesterol_total"])) / years_factor, 2),
-            "delta_bmi": round((float(curr_v["bmi"]) - float(prev_v["bmi"])) / years_factor, 2),
+        pairs = {
+            "delta_egfr": "egfr",
+            "delta_uacr": "uacr",
+            "delta_ap_hi": "ap_hi",
+            "delta_colesterol": "colesterol_total",
+            "delta_bmi": "bmi",
         }
+        deltas = {}
+        for delta_key, field_name in pairs.items():
+            previous = prev_v.get(field_name)
+            current = curr_v.get(field_name)
+            if previous in (None, "") or current in (None, ""):
+                deltas[delta_key] = None
+                continue
+            try:
+                deltas[delta_key] = round(
+                    (float(current) - float(previous)) / years_factor, 2
+                )
+            except (TypeError, ValueError):
+                deltas[delta_key] = None
+        return deltas
 
-    def load_all_analiticas(self, modo: str = "B") -> List[Tuple[str, LabInput, Dict[str, Any]]]:
+    def load_all_analiticas(self, modo: str = "B") -> List[AnaliticaCupo]:
         """
         Carga todas las carpetas de pacientes (y archivos sueltos si existen).
-        Si modo == 'B', calcula el seguimiento longitudinal completo cuando hay >=2 visitas.
-        Si modo == 'A', evalúa únicamente la última analítica de forma aislada (progresion=None).
+        Retiene las entradas incompletas para mostrarlas al profesional, sin crear predicciones.
         """
         if not self.base_dir.exists():
             return []
 
-        analiticas: List[Tuple[str, LabInput, Dict[str, Any]]] = []
+        analiticas: List[AnaliticaCupo] = []
 
         for entry in sorted(self.base_dir.iterdir()):
             if entry.name.startswith("."):
                 continue
-            if entry.is_dir():
-                parsed = self.load_single_item(entry.name, modo=modo)
-                if parsed:
-                    analiticas.append(parsed)
-            elif entry.is_file():
-                ext = entry.suffix.lower()
-                if ext == ".json":
-                    parsed = self.load_single_item(entry.name, modo=modo)
+            if entry.is_dir() or (entry.is_file() and entry.suffix.lower() == ".json"):
+                try:
+                    parsed = self.load_single_item(entry.name, modo=modo, validate=False)
                     if parsed:
-                        analiticas.append(parsed)
-                elif ext == ".csv":
-                    parsed_list = self._parse_csv_file(entry, modo=modo)
-                    analiticas.extend(parsed_list)
+                        filename, _, raw_data = parsed
+                        analiticas.append(self._make_cupo_record(filename, raw_data, modo))
+                except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+                    analiticas.append(AnaliticaCupo(
+                        archivo=entry.name,
+                        lab_input=None,
+                        datos_entrada={"paciente_id": entry.name},
+                        estado="DATOS_NO_VALIDOS",
+                        errores_datos=[f"No se pudo leer la analítica: {exc}"],
+                    ))
+            elif entry.is_file() and entry.suffix.lower() == ".csv":
+                analiticas.extend(self._load_csv_cupo_records(entry, modo))
 
         return analiticas
+
+    def _make_cupo_record(self, filename: str, raw_data: Dict[str, Any], modo: str) -> AnaliticaCupo:
+        mode_a = (modo or "B").upper() == "A"
+        data = dict(raw_data)
+        if mode_a:
+            data["progresion"] = None
+            for key in list(data):
+                if key.startswith("delta_"):
+                    data[key] = None
+        missing = [
+            key for key in REQUIRED_CLINICAL_FIELDS
+            if data.get(key) is None or (isinstance(data.get(key), str) and not data[key].strip())
+        ]
+        if missing:
+            return AnaliticaCupo(
+                archivo=filename,
+                lab_input=None,
+                datos_entrada=data,
+                estado="DATOS_INSUFICIENTES",
+                campos_pendientes=missing,
+            )
+        try:
+            lab_input = self._dict_to_lab_input(data, force_no_progression=mode_a)
+        except (ValidationError, KeyError, TypeError, ValueError) as exc:
+            error_fields = []
+            if isinstance(exc, ValidationError):
+                error_fields = sorted({
+                    str(error["loc"][-1])
+                    for error in exc.errors()
+                    if error.get("loc")
+                })
+            errors = error_fields or [str(exc)]
+            return AnaliticaCupo(
+                archivo=filename,
+                lab_input=None,
+                datos_entrada=data,
+                estado="DATOS_NO_VALIDOS",
+                errores_datos=errors,
+            )
+        return AnaliticaCupo(
+            archivo=filename,
+            lab_input=lab_input,
+            datos_entrada=data,
+            estado="DATOS_VALIDOS",
+        )
+
+    def _load_csv_cupo_records(self, path: Path, modo: str) -> List[AnaliticaCupo]:
+        records = []
+        try:
+            with path.open("r", encoding="utf-8", newline="") as csv_file:
+                for idx, row in enumerate(csv.DictReader(csv_file)):
+                    filename = f"{path.name} (fila {idx + 1})"
+                    raw_data = dict(row)
+                    raw_data["paciente_id"] = f"{path.name}:fila-{idx + 1}"
+                    if (modo or "B").upper() == "A":
+                        for key in list(raw_data):
+                            if key.startswith("delta_"):
+                                raw_data[key] = None
+                    records.append(self._make_cupo_record(filename, raw_data, modo))
+        except (OSError, UnicodeDecodeError, csv.Error) as exc:
+            records.append(AnaliticaCupo(
+                archivo=path.name,
+                lab_input=None,
+                datos_entrada={"paciente_id": path.stem},
+                estado="DATOS_NO_VALIDOS",
+                errores_datos=[f"No se pudo leer el CSV: {exc}"],
+            ))
+        return records
 
     def load_single_item(
         self,
         paciente_id: str,
         modo: str = "B",
         analitica_archivo: Optional[str] = None,
-    ) -> Optional[Tuple[str, LabInput, Dict[str, Any]]]:
+        validate: bool = True,
+    ) -> Optional[Tuple[str, Optional[LabInput], Dict[str, Any]]]:
         """
         Carga una carpeta de paciente o un archivo individual en el modo indicado:
         - modo='B' (Seguimiento completo): utiliza las visitas cronológicas de la carpeta para calcular
@@ -260,6 +383,8 @@ class FileService:
             visit_summaries: List[Dict[str, Any]] = []
             for vf in visit_files:
                 data = json.loads(vf.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    raise ValueError(f"La analítica {vf.name} debe contener un objeto JSON.")
                 data["_archivo"] = vf.name
                 raw_visits.append(data)
                 visit_summaries.append(
@@ -295,7 +420,10 @@ class FileService:
                 raw_out["num_analiticas"] = len(raw_visits)
                 raw_out["historial_visitas"] = visit_summaries
 
-                lab_input = self._dict_to_lab_input(raw_out, force_no_progression=True)
+                lab_input = (
+                    self._dict_to_lab_input(raw_out, force_no_progression=True)
+                    if validate else None
+                )
                 return target_path.name, lab_input, raw_out
 
             else:
@@ -317,23 +445,36 @@ class FileService:
                 latest_data["num_analiticas"] = len(raw_visits)
                 latest_data["historial_visitas"] = visit_summaries
 
-                lab_input = self._dict_to_lab_input(
-                    latest_data, force_no_progression=(effective_mode == "MODO_A")
+                lab_input = (
+                    self._dict_to_lab_input(
+                        latest_data, force_no_progression=(effective_mode == "MODO_A")
+                    )
+                    if validate else None
                 )
                 return target_path.name, lab_input, latest_data
 
         elif target_path.is_file() and target_path.suffix.lower() == ".json":
             raw_data = json.loads(target_path.read_text(encoding="utf-8"))
+            if not isinstance(raw_data, dict):
+                raise ValueError(f"La analítica {target_path.name} debe contener un objeto JSON.")
             force_no_prog = modo_norm == "A"
             if force_no_prog:
                 raw_data["progresion"] = None
                 for k in list(raw_data.keys()):
                     if k.startswith("delta_"):
                         raw_data[k] = None
-            lab_input = self._dict_to_lab_input(raw_data, force_no_progression=force_no_prog)
+            lab_input = (
+                self._dict_to_lab_input(raw_data, force_no_progression=force_no_prog)
+                if validate else None
+            )
             raw_data["paciente_id"] = target_path.name
             raw_data["analitica_evaluada"] = target_path.name
-            raw_data["modo_evaluacion"] = "MODO_B" if lab_input.progresion is not None else "MODO_A"
+            has_progression = (
+                lab_input.progresion is not None
+                if lab_input is not None
+                else bool(raw_data.get("progresion"))
+            )
+            raw_data["modo_evaluacion"] = "MODO_B" if has_progression else "MODO_A"
             raw_data["num_analiticas"] = 1
             return target_path.name, lab_input, raw_data
 

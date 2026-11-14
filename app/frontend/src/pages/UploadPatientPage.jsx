@@ -8,7 +8,7 @@ const fields = [
   ['bmi', 'IMC (kg/m²)'], ['ap_hi', 'Sistólica (mmHg)'],
   ['ap_lo', 'Diastólica (mmHg)'], ['colesterol_total', 'Colesterol (mg/dL)'],
   ['fuma', 'Fuma (0 no, 1 sí)'], ['diabetes', 'Diabetes (0 no, 1 sí)'],
-  ['egfr', 'eGFR (mL/min)'], ['uacr', 'uACR (mg/g)'],
+  ['egfr', 'Filtrado del riñón (mL/min)'], ['uacr', 'Albúmina en orina (mg/g)'],
 ];
 
 export const UploadPatientPage = () => {

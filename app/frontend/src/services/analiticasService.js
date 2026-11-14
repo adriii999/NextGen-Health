@@ -3,13 +3,16 @@ import apiClient from './apiClient.js';
 const number = (value) => value === null || value === undefined || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
 
 export function mapPatient(item, index = 0) {
-  if (!item?.evaluacion || !item.archivo) throw new Error('Respuesta de análisis inválida.');
+  const incompleteStates = ['DATOS_INSUFICIENTES', 'DATOS_NO_VALIDOS'];
+  if (!item?.archivo || (!item.evaluacion && !incompleteStates.includes(item.estado))) {
+    throw new Error('Respuesta de análisis inválida.');
+  }
   const raw = item.datos_entrada || {};
-  const evaluation = item.evaluacion;
+  const evaluation = item.evaluacion || {};
   const progression = raw.progresion || {};
   const fields = [
-    ['egfr', 'egfr', 'delta_egfr', 'mL/min/1,73 m²', 'Filtrado glomerular (eGFR)'],
-    ['uacr', 'uacr', 'delta_uacr', 'mg/g', 'Cociente albúmina/creatinina (uACR)'],
+    ['egfr', 'egfr', 'delta_egfr', 'mL/min/1,73 m²', 'Filtrado del riñón'],
+    ['uacr', 'uacr', 'delta_uacr', 'mg/g', 'Albúmina en orina'],
     ['pas', 'ap_hi', 'delta_ap_hi', 'mmHg', 'Presión arterial sistólica'],
     ['pad', 'ap_lo', null, 'mmHg', 'Presión arterial diastólica'],
     ['colesterol', 'colesterol_total', 'delta_colesterol', 'mg/dL', 'Colesterol total'],
@@ -48,11 +51,14 @@ export function mapPatient(item, index = 0) {
     tiene_progresion,
     disparador_principal: evaluation.factores_clave?.[0]?.descripcion,
     datos_entrada: raw,
+    estado: item.estado || 'EVALUADA',
+    campos_pendientes: item.campos_pendientes || [],
+    errores_datos: item.errores_datos || [],
   };
 }
 
 export function analysisError(error) {
-  if (error?.response?.status === 501) return 'El modelo todavía no está disponible (HTTP 501). Entrena y exporta el artefacto antes de analizar.';
+  if (error?.response?.status === 501) return 'No se puede revisar el cupo porque falta el modelo de evaluación. Avisa al equipo técnico.';
   const detail = error?.response?.data?.detail;
   if (Array.isArray(detail)) return detail.map((item) => {
     const location = item.loc || [];
@@ -62,7 +68,7 @@ export function analysisError(error) {
   }).join('\n');
   if (typeof detail === 'string') return detail;
   if (error?.response?.status === 422) return 'Los parámetros introducidos están fuera de los rangos fisiológicos permitidos.';
-  if (!error?.response && error?.code) return 'No se ha podido conectar con el servicio backend. Comprueba la conexión y vuelve a intentarlo.';
+  if (!error?.response && error?.code) return 'No se pudo conectar para revisar las analíticas. Comprueba la conexión e inténtalo de nuevo.';
   return detail?.mensaje || error?.message || 'No se ha podido completar la operación. Vuelve a intentarlo.';
 }
 
@@ -92,6 +98,11 @@ export const analiticasService = {
     const { data } = await apiClient.get('/analiticas');
     if (!Array.isArray(data)) throw new Error('Listado de archivos inválido.');
     return { success: true, archivos: data, fromApi: true };
+  },
+  async getVersionFuentes() {
+    const { data } = await apiClient.get('/analiticas/version-fuentes');
+    if (typeof data?.version !== 'string') throw new Error('No se pudo comprobar si hay cambios en las analíticas.');
+    return data.version;
   },
   async analizarCarpeta(modo = 'B') {
     const { data } = await apiClient.post(`/analiticas/analizar-carpeta?modo=${encodeURIComponent(modo)}`, undefined, { timeout: 120000 });

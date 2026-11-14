@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.backend.schemas.response import (
     AnaliticaItem,
     AnaliticaEvaluadaItem,
+    AnaliticaLoteItem,
     EvaluarAnaliticaRequest,
 )
 from app.backend.services.file_service import FileService
@@ -44,6 +45,11 @@ def evaluate_uploaded_patient(
 def list_analiticas(file_service: FileService = Depends(get_file_service)):
     """Lista las carpetas de seguimiento de pacientes y analíticas en data/analiticas/."""
     return file_service.scan_folder()
+
+
+@router.get("/version-fuentes")
+def source_version(file_service: FileService = Depends(get_file_service)):
+    return {"version": file_service.source_fingerprint()}
 
 
 @router.post(
@@ -126,7 +132,7 @@ def evaluate_single_patient_or_lab(
 
 @router.post(
     "/analizar-carpeta",
-    response_model=List[AnaliticaEvaluadaItem],
+    response_model=List[AnaliticaLoteItem],
     status_code=status.HTTP_200_OK,
     responses={
         501: {
@@ -161,21 +167,30 @@ def analyze_folder_analiticas(
         if not items:
             return []
 
-        evaluated_list: List[AnaliticaEvaluadaItem] = []
-        for filename, lab_input, raw_data in items:
-            evaluation = model_service.evaluate(lab_input)
-            evaluated_list.append(
-                AnaliticaEvaluadaItem(
-                    archivo=filename,
-                    evaluacion=evaluation,
-                    datos_entrada=raw_data,
-                )
-            )
+        evaluated_list: List[AnaliticaLoteItem] = []
+        pending_list: List[AnaliticaLoteItem] = []
+        for item in items:
+            if item.lab_input is None:
+                pending_list.append(AnaliticaLoteItem(
+                    archivo=item.archivo,
+                    estado=item.estado,
+                    campos_pendientes=item.campos_pendientes,
+                    errores_datos=item.errores_datos,
+                    datos_entrada=item.datos_entrada,
+                ))
+                continue
+            evaluation = model_service.evaluate(item.lab_input)
+            evaluated_list.append(AnaliticaLoteItem(
+                archivo=item.archivo,
+                estado="EVALUADA",
+                evaluacion=evaluation,
+                datos_entrada=item.datos_entrada,
+            ))
 
         # Ordenar por severidad: Prioridad ALTA > MEDIA > BAJA y riesgo máximo descendente
         priority_order = {"ALTA": 3, "MEDIA": 2, "BAJA": 1}
 
-        def sort_key(item: AnaliticaEvaluadaItem):
+        def sort_key(item: AnaliticaLoteItem):
             prio_val = priority_order.get(item.evaluacion.nivel_prioridad, 0)
             max_risk = max(
                 item.evaluacion.tipos_riesgo.riesgo_aterosclerotico.valor,
@@ -185,7 +200,7 @@ def analyze_folder_analiticas(
             return (prio_val, max_risk)
 
         evaluated_list.sort(key=sort_key, reverse=True)
-        return evaluated_list
+        return evaluated_list + pending_list
 
     except ModelNotImplementedError as e:
         raise HTTPException(

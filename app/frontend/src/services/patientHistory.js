@@ -1,6 +1,6 @@
 export const clinicalFields = [
-  { key: 'egfr', label: 'Filtrado glomerular', unit: 'mL/min' },
-  { key: 'uacr', label: 'Albúmina/creatinina urinaria', unit: 'mg/g' },
+  { key: 'egfr', label: 'Filtrado del riñón', unit: 'mL/min' },
+  { key: 'uacr', label: 'Albúmina en orina', unit: 'mg/g' },
   { key: 'colesterol_total', label: 'Colesterol total', unit: 'mg/dL' },
   { key: 'ap_hi', label: 'Presión sistólica', unit: 'mmHg' },
   { key: 'ap_lo', label: 'Presión diastólica', unit: 'mmHg' },

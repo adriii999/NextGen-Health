@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field
 
 
@@ -35,6 +35,7 @@ class EvaluationResponse(BaseModel):
     hay_riesgo: bool = Field(..., description="False si ningún umbral se supera (perfil bajo control)")
     conclusion_diagnostica: str = Field(..., description="Veredicto diagnóstico integral")
     nivel_prioridad: str = Field(..., description="Nivel de prioridad: BAJA, MEDIA o ALTA")
+    motivos_prioridad: List[str] = Field(default_factory=list, description="Criterios usados para la prioridad")
     tipos_riesgo: TiposRiesgo = Field(..., description="Desglose multidimensional de los 3 fenotipos")
     factores_clave: List[FactorClave] = Field(default_factory=list, description="Factores explicativos SHAP")
     recomendacion_preventiva: str = Field(..., description="Acción médica preventiva sugerida")
@@ -75,3 +76,12 @@ class AnaliticaEvaluadaItem(BaseModel):
     archivo: str
     evaluacion: EvaluationResponse
     datos_entrada: Dict[str, Any]
+
+
+class AnaliticaLoteItem(BaseModel):
+    archivo: str
+    estado: Literal["EVALUADA", "DATOS_INSUFICIENTES", "DATOS_NO_VALIDOS"]
+    campos_pendientes: List[str] = Field(default_factory=list)
+    errores_datos: List[str] = Field(default_factory=list)
+    evaluacion: Optional[EvaluationResponse] = None
+    datos_entrada: Dict[str, Any] = Field(default_factory=dict)

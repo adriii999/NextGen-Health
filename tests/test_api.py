@@ -94,6 +94,51 @@ def test_api_analiticas_list_works_independently(http_client: httpx.Client):
     assert isinstance(response.json(), list)
 
 
+def test_api_batch_keeps_incomplete_records_without_predicting_them(http_client, tmp_path, monkeypatch):
+    """A missing lab value is returned as pending and does not cancel valid evaluations."""
+    from app.backend.schemas.response import (
+        EvaluationResponse, TiposRiesgo, RiesgoItem,
+    )
+
+    monkeypatch.setattr(settings, "ANALITICAS_DIR", tmp_path)
+    complete = {
+        "edad": 55, "sexo": 1, "bmi": 25.0, "ap_hi": 130, "ap_lo": 80,
+        "colesterol_total": 200.0, "fuma": 0, "diabetes": 0, "egfr": 90.0, "uacr": 12.0,
+    }
+    (tmp_path / "completo.json").write_text(json.dumps(complete), encoding="utf-8")
+    (tmp_path / "pendiente.json").write_text(json.dumps({**complete, "uacr": None}), encoding="utf-8")
+
+    class ReadyModel:
+        def is_model_loaded(self):
+            return True
+
+        def evaluate(self, lab_input):
+            safe = RiesgoItem(valor=0.05, umbral=0.1, alerta=False, interpretacion="Bajo")
+            return EvaluationResponse(
+                hay_riesgo=False,
+                conclusion_diagnostica="Sin alerta del modelo.",
+                nivel_prioridad="BAJA",
+                tipos_riesgo=TiposRiesgo(
+                    riesgo_aterosclerotico=safe,
+                    riesgo_insuficiencia_cardiaca=safe,
+                    riesgo_cardiorrenal=safe,
+                ),
+                recomendacion_preventiva="Revisar contexto clínico.",
+            )
+
+    monkeypatch.setattr(app.state, "model_service", ReadyModel())
+
+    response = http_client.post("/api/analiticas/analizar-carpeta")
+
+    assert response.status_code == 200
+    results = {item["archivo"]: item for item in response.json()}
+    assert results["completo.json"]["estado"] == "EVALUADA"
+    assert results["completo.json"]["evaluacion"]["hay_riesgo"] is False
+    assert results["pendiente.json"]["estado"] == "DATOS_INSUFICIENTES"
+    assert results["pendiente.json"]["evaluacion"] is None
+    assert results["pendiente.json"]["campos_pendientes"] == ["uacr"]
+
+
 def test_api_predict_invalid_blood_pressure(http_client: httpx.Client):
     """La validación fisiológica Pydantic (422) ocurre en el servidor antes del modelo."""
     payload = {

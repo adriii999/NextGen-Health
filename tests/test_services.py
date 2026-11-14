@@ -139,8 +139,66 @@ def test_model_service_uses_independent_models_and_thresholds():
     assert result.tipos_riesgo.riesgo_aterosclerotico.alerta is True
     assert result.tipos_riesgo.riesgo_insuficiencia_cardiaca.alerta is False
     assert result.tipos_riesgo.riesgo_cardiorrenal.alerta is True
+    assert set(result.motivos_prioridad) == {
+        "ALERTA_CIRCULACION", "ALERTA_RINON_CORAZON", "PUNTUACION_ALTA"
+    }
     assert all(model.predict_proba.called for model in service.models.values())
     assert result.factores_clave
+
+
+def test_priority_reasons_reflect_actual_triggers():
+    service = ModelService()
+    renal = service._compute_kdigo_profile({"egfr": 50, "uacr": 100})
+    reasons = service._priority_reasons(
+        True, True, True,
+        {"ap_hi": 170, "ap_lo": 80, "delta_egfr": -6},
+        {"a": 0.5}, renal,
+    )
+    assert set(reasons) == {
+        "ALERTA_CIRCULACION", "ALERTA_CORAZON", "ALERTA_RINON_CORAZON",
+        "DESCENSO_RAPIDO", "RIESGO_RENAL_ALTO", "PRESION_ALTA",
+        "PUNTUACION_ALTA", "TRES_ALERTAS",
+    }
+    assert service._priority_reasons(False, False, False, {}, {}, renal) == [
+        "SIN_ALERTAS", "RIESGO_RENAL_ALTO"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("changes", "expected"),
+    [
+        ({"egfr": 35, "uacr": 340}, "RIESGO_RENAL_ALTO"),
+        ({"ap_hi": 170}, "PRESION_ALTA"),
+        ({"progresion": ProgressionDelta(delta_egfr=-6)}, "DESCENSO_RAPIDO"),
+    ],
+)
+def test_observed_signals_are_not_hidden_by_no_model_alert(changes, expected):
+    service = ModelService()
+    service.models, service.explainers = {}, {}
+    for name in service.thresholds:
+        model, explainer = MagicMock(), MagicMock()
+        model.predict_proba.return_value = np.array([[0.99, 0.01]])
+        explainer.shap_values.return_value = np.zeros((1, len(service.feature_names)))
+        service.models[name], service.explainers[name] = model, explainer
+    service.artifact_loaded = True
+    values = dict(edad=55, sexo=1, bmi=26, ap_hi=130, ap_lo=80,
+                  colesterol_total=200, fuma=0, diabetes=0, egfr=90, uacr=10)
+    result = service.evaluate(LabInput(**{**values, **changes}))
+    assert result.hay_riesgo is False
+    assert result.nivel_prioridad == "ALTA"
+    assert expected in result.motivos_prioridad
+    assert "sin riesgo cardiovascular" not in result.conclusion_diagnostica.lower()
+    assert "iSGLT2" not in result.recomendacion_preventiva
+
+
+def test_source_fingerprint_detects_file_content_changes(tmp_path):
+    source = tmp_path / "paciente.json"
+    source.write_text('{"egfr": 90}', encoding="utf-8")
+    service = FileService(base_dir=tmp_path)
+    before = service.source_fingerprint()
+    assert before == service.source_fingerprint()
+    source.write_text('{"egfr": 80}', encoding="utf-8")
+    assert before != service.source_fingerprint()
 
 
 def test_model_service_executes_shap_even_when_low_risk_and_describes_protective_factors():
@@ -228,6 +286,49 @@ def test_file_service_parses_json_and_csv(tmp_path):
     filenames = [item.archivo for item in items]
     assert "analitica_01.json" in filenames
     assert "analitica_02.csv" in filenames
+
+
+def test_file_service_keeps_incomplete_patients_for_review(tmp_path):
+    """An incomplete clinical record remains visible instead of disappearing or failing the batch."""
+    complete = {
+        "edad": 55, "sexo": 1, "bmi": 25.0, "ap_hi": 130, "ap_lo": 80,
+        "colesterol_total": 200.0, "fuma": 0, "diabetes": 0, "egfr": 90.0, "uacr": 12.0,
+    }
+    (tmp_path / "completo.json").write_text(json.dumps(complete), encoding="utf-8")
+    incomplete = {**complete, "uacr": None}
+    (tmp_path / "pendiente.json").write_text(json.dumps(incomplete), encoding="utf-8")
+    invalid = {**complete, "egfr": -1}
+    (tmp_path / "invalido.json").write_text(json.dumps(invalid), encoding="utf-8")
+
+    records = FileService(base_dir=tmp_path).load_all_analiticas()
+
+    assert len(records) == 3
+    by_file = {record.archivo: record for record in records}
+    assert by_file["completo.json"].estado == "DATOS_VALIDOS"
+    assert by_file["pendiente.json"].estado == "DATOS_INSUFICIENTES"
+    assert by_file["pendiente.json"].lab_input is None
+    assert by_file["pendiente.json"].campos_pendientes == ["uacr"]
+    assert by_file["pendiente.json"].datos_entrada["uacr"] is None
+    assert by_file["invalido.json"].estado == "DATOS_NO_VALIDOS"
+    assert by_file["invalido.json"].lab_input is None
+    assert "egfr" in by_file["invalido.json"].errores_datos
+
+
+def test_file_service_keeps_csv_rows_with_missing_data(tmp_path):
+    csv_path = tmp_path / "cupo.csv"
+    csv_path.write_text(
+        "edad,sexo,bmi,ap_hi,ap_lo,colesterol_total,fuma,diabetes,egfr,uacr\n"
+        "62,1,27,132,82,198,0,1,72,\n",
+        encoding="utf-8",
+    )
+
+    records = FileService(base_dir=tmp_path).load_all_analiticas()
+
+    assert len(records) == 1
+    assert records[0].archivo == "cupo.csv (fila 1)"
+    assert records[0].estado == "DATOS_INSUFICIENTES"
+    assert records[0].campos_pendientes == ["uacr"]
+    assert records[0].lab_input is None
 
 
 def test_file_service_patient_folders_modo_a_and_modo_b(tmp_path):
