@@ -151,15 +151,37 @@ class FileService:
         )
 
     def _compute_deltas_from_visits(self, raw_visits: List[Dict[str, Any]]) -> Dict[str, float]:
-        """Calcula los deltas interanuales entre la penúltima (T-1) y la última visita (T)."""
+        """
+        Calcula los deltas interanuales (tasa de cambio por año) entre la penúltima (T-1)
+        y la última visita (T), anualizando por el intervalo real de fechas si difiere de 1 año.
+        """
         prev_v = raw_visits[-2]
         curr_v = raw_visits[-1]
+
+        years_factor = 1.0
+        f_prev = prev_v.get("fecha_analitica")
+        f_curr = curr_v.get("fecha_analitica")
+        if f_prev and f_curr:
+            for fmt in ("%Y-%m-%d", "%Y-%m"):
+                try:
+                    dt_prev = datetime.strptime(str(f_prev).strip(), fmt)
+                    dt_curr = datetime.strptime(str(f_curr).strip(), fmt)
+                    days = (dt_curr - dt_prev).days
+                    if days >= 45:
+                        years = days / 365.25
+                        # Si las visitas están separadas por ~1 año (330 a 400 días), factor = 1.0 exacto
+                        if abs(years - 1.0) > 0.08:
+                            years_factor = years
+                    break
+                except ValueError:
+                    continue
+
         return {
-            "delta_egfr": round(float(curr_v["egfr"]) - float(prev_v["egfr"]), 2),
-            "delta_uacr": round(float(curr_v["uacr"]) - float(prev_v["uacr"]), 2),
-            "delta_ap_hi": round(float(curr_v["ap_hi"]) - float(prev_v["ap_hi"]), 2),
-            "delta_colesterol": round(float(curr_v["colesterol_total"]) - float(prev_v["colesterol_total"]), 2),
-            "delta_bmi": round(float(curr_v["bmi"]) - float(prev_v["bmi"]), 2),
+            "delta_egfr": round((float(curr_v["egfr"]) - float(prev_v["egfr"])) / years_factor, 2),
+            "delta_uacr": round((float(curr_v["uacr"]) - float(prev_v["uacr"])) / years_factor, 2),
+            "delta_ap_hi": round((float(curr_v["ap_hi"]) - float(prev_v["ap_hi"])) / years_factor, 2),
+            "delta_colesterol": round((float(curr_v["colesterol_total"]) - float(prev_v["colesterol_total"])) / years_factor, 2),
+            "delta_bmi": round((float(curr_v["bmi"]) - float(prev_v["bmi"])) / years_factor, 2),
         }
 
     def load_all_analiticas(self, modo: str = "B") -> List[Tuple[str, LabInput, Dict[str, Any]]]:

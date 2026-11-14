@@ -9,7 +9,7 @@ class ProgressionDelta(BaseModel):
         None, ge=-80.0, le=50.0, description="Variación anual de eGFR (mL/min/año)"
     )
     delta_uacr: Optional[float] = Field(
-        None, ge=-300.0, le=400.0, description="Variación anual de UACR (mg/g)"
+        None, ge=-2000.0, le=2000.0, description="Variación anual de UACR (mg/g)"
     )
     delta_ap_hi: Optional[float] = Field(
         None, ge=-90.0, le=120.0, description="Variación anual de presión sistólica (mmHg)"
@@ -32,8 +32,8 @@ class LabInput(BaseModel):
     colesterol_total: float = Field(..., ge=80.0, le=450.0, description="Colesterol total continuo (mg/dL)")
     fuma: int = Field(..., ge=0, le=1, description="Tabaquismo activo (0: No, 1: Sí)")
     diabetes: int = Field(..., ge=0, le=1, description="Diagnóstico de diabetes (0: No, 1: Sí)")
-    egfr: float = Field(..., ge=5.0, le=140.0, description="Tasa de filtración glomerular estimada (mL/min)")
-    uacr: float = Field(..., ge=1.0, le=500.0, description="Cociente albúmina/creatinina en orina (mg/g)")
+    egfr: float = Field(..., ge=3.0, le=160.0, description="Tasa de filtración glomerular estimada (mL/min)")
+    uacr: float = Field(..., ge=0.1, le=5000.0, description="Cociente albúmina/creatinina en orina (mg/g)")
     progresion: Optional[ProgressionDelta] = None
 
     @model_validator(mode="after")

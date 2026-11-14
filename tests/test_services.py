@@ -143,6 +143,49 @@ def test_model_service_uses_independent_models_and_thresholds():
     assert result.factores_clave
 
 
+def test_model_service_executes_shap_even_when_low_risk_and_describes_protective_factors():
+    """
+    En un entorno real de Atención Primaria, incluso cuando hay_riesgo=False,
+    el modelo debe ejecutar TreeSHAP para mostrar factores protectores o limítrofes,
+    y las descripciones médicas deben reflejar el estado real del paciente (ej. diabetes=0 -> Ausencia de diabetes).
+    """
+    service = ModelService()
+    service.models = {}
+    service.explainers = {}
+    for risk_name in service.thresholds:
+        model = MagicMock()
+        model.predict_proba.return_value = np.array([[0.94, 0.06]])
+        service.models[risk_name] = model
+        explainer = MagicMock()
+        # Valores SHAP negativos (protectores) en probabilidad
+        shap_row = np.full((1, len(service.feature_names)), -0.02)
+        # Hacer que egfr y diabetes tengan mayor magnitud protectora
+        shap_row[0, service.feature_names.index("egfr")] = -0.06
+        shap_row[0, service.feature_names.index("diabetes")] = -0.05
+        explainer.shap_values.return_value = shap_row
+        service.explainers[risk_name] = explainer
+
+    service.thresholds = {
+        "riesgo_aterosclerotico": 0.25,
+        "riesgo_insuficiencia_cardiaca": 0.25,
+        "riesgo_cardiorrenal": 0.25,
+    }
+    service.artifact_loaded = True
+
+    lab = LabInput(
+        edad=42, sexo=1, bmi=22.0, ap_hi=115, ap_lo=75,
+        colesterol_total=170, fuma=0, diabetes=0, egfr=102, uacr=7,
+    )
+    result = service.evaluate(lab)
+
+    assert result.hay_riesgo is False
+    assert len(result.factores_clave) > 0, "Debe ejecutar SHAP incluso cuando hay_riesgo es False"
+    diabetes_factor = next((f for f in result.factores_clave if f.variable == "diabetes"), None)
+    assert diabetes_factor is not None
+    assert diabetes_factor.impacto.startswith("-")
+    assert "ausencia" in diabetes_factor.descripcion.lower() or "sin diabetes" in diabetes_factor.descripcion.lower()
+
+
 def test_file_service_empty_folder(tmp_path):
     """FileService maneja carpetas vacías sin arrojar excepción."""
     fs = FileService(base_dir=tmp_path)
@@ -256,4 +299,60 @@ def test_file_service_patient_folders_modo_a_and_modo_b(tmp_path):
     assert lab_a.progresion is None
     assert lab_a.egfr == pytest.approx(82.0)
     assert raw_a["modo_evaluacion"] == "MODO_A"
+
+
+def test_model_service_assigns_high_priority_in_modo_a_for_severe_kdigo_or_high_risk():
+    """
+    En consulta real de Atención Primaria, un paciente de primera visita (Modo A, sin deltas)
+    con daño renal severo (KDIGO ALTO/MUY_ALTO, ej. eGFR 35 y uACR 350) o riesgo elevado
+    DEBE recibir nivel_prioridad == 'ALTA', no 'MEDIA'.
+    """
+    service = ModelService()
+    service.models = {}
+    service.explainers = {}
+    for risk_name in service.thresholds:
+        model = MagicMock()
+        model.predict_proba.return_value = np.array([[0.25, 0.75]])
+        service.models[risk_name] = model
+        explainer = MagicMock()
+        explainer.shap_values.return_value = np.full((1, len(service.feature_names)), 0.12)
+        service.explainers[risk_name] = explainer
+    service.artifact_loaded = True
+
+    lab_modo_a_severo = LabInput(
+        edad=67, sexo=2, bmi=31.0, ap_hi=168, ap_lo=96,
+        colesterol_total=255.0, fuma=1, diabetes=1, egfr=35.0, uacr=340.0,
+        progresion=None,
+    )
+    res = service.evaluate(lab_modo_a_severo)
+    assert res.hay_riesgo is True
+    assert res.nivel_prioridad == "ALTA"
+
+
+def test_file_service_annualizes_deltas_when_visits_are_six_months_apart(tmp_path):
+    """
+    Si dos analíticas de seguimiento están separadas por 6 meses (ej. 2025-09-10 a 2026-03-10),
+    la caída de -5.0 mL/min en medio año equivale a una tasa anualizada de ~ -10.0 mL/min/año.
+    """
+    pac_dir = tmp_path / "paciente_semestral"
+    pac_dir.mkdir()
+    v1 = {
+        "fecha_analitica": "2025-09-10",
+        "edad": 60, "sexo": 1, "bmi": 26.0, "ap_hi": 130, "ap_lo": 80,
+        "colesterol_total": 190.0, "fuma": 0, "diabetes": 1, "egfr": 80.0, "uacr": 20.0,
+    }
+    v2 = {
+        "fecha_analitica": "2026-03-10",
+        "edad": 60.5, "sexo": 1, "bmi": 26.5, "ap_hi": 136, "ap_lo": 82,
+        "colesterol_total": 196.0, "fuma": 0, "diabetes": 1, "egfr": 75.0, "uacr": 32.0,
+    }
+    (pac_dir / "2025-09_basal.json").write_text(json.dumps(v1), encoding="utf-8")
+    (pac_dir / "2026-03_control.json").write_text(json.dumps(v2), encoding="utf-8")
+
+    fs = FileService(base_dir=tmp_path)
+    _, lab_b, _ = fs.load_single_item("paciente_semestral", modo="B")
+    assert lab_b.progresion is not None
+    # -5 mL/min en ~0.495 años -> ~ -10.1 mL/min/año
+    assert lab_b.progresion.delta_egfr <= -9.5
+
 

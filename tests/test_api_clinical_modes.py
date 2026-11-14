@@ -63,6 +63,8 @@ def test_api_predict_modo_a_control_sano(http_client: httpx.Client):
     assert tipos["riesgo_aterosclerotico"]["alerta"] is False
     assert tipos["riesgo_insuficiencia_cardiaca"]["alerta"] is False
     assert tipos["riesgo_cardiorrenal"]["alerta"] is False
+    # Incluso en control sano debe ejecutar SHAP y devolver factores clave (protectores/basales)
+    assert len(data["factores_clave"]) > 0
 
 
 def test_api_predict_modo_a_alto_riesgo_franco(http_client: httpx.Client):
@@ -95,7 +97,7 @@ def test_api_predict_modo_a_alto_riesgo_franco(http_client: httpx.Client):
     data = response.json()
 
     assert data["hay_riesgo"] is True
-    assert data["nivel_prioridad"] in ["MEDIA", "ALTA"]
+    assert data["nivel_prioridad"] == "ALTA"
 
     tipos = data["tipos_riesgo"]
     assert tipos["riesgo_aterosclerotico"]["alerta"] is True

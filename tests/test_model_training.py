@@ -74,6 +74,11 @@ def test_train_models_produces_valid_artifact(tmp_path):
     assert set(artifact["models"].keys()) == set(TARGET_COLUMNS.keys())
     assert artifact_path.exists()
 
+    # Verificar que las métricas incluyen calibración clínica (Brier Score)
+    for risk_name in TARGET_COLUMNS:
+        assert "brier_score" in artifact["metrics"][risk_name]
+        assert 0.0 <= artifact["metrics"][risk_name]["brier_score"] <= 1.0
+
     service = ModelService()
     assert service.load_artifacts(str(artifact_path)) is True
     assert service.is_model_loaded() is True

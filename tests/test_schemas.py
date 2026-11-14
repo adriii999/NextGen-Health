@@ -138,6 +138,26 @@ def test_evaluation_response_schema():
     assert len(resp.factores_clave) == 1
 
 
+def test_lab_input_accepts_severe_macroalbuminuria_a3():
+    """En Atención Primaria real, pacientes con nefropatía diabética pueden presentar uACR > 500 mg/g (estadio A3)."""
+    data = {
+        "edad": 64,
+        "sexo": 2,
+        "bmi": 29.5,
+        "ap_hi": 155,
+        "ap_lo": 92,
+        "colesterol_total": 215.0,
+        "fuma": 0,
+        "diabetes": 1,
+        "egfr": 34.0,
+        "uacr": 850.0,
+        "progresion": None,
+    }
+    model = LabInput(**data)
+    assert model.uacr == 850.0
+    assert model.egfr == 34.0
+
+
 def test_perfil_renal_kdigo_schema():
     """Valida la inclusión de la estratificación renal oficial KDIGO 2024."""
     from app.backend.schemas.response import PerfilRenalKDIGO

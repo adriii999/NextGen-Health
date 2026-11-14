@@ -162,30 +162,16 @@ class ModelService:
 
         perfil_renal = self._compute_kdigo_profile(features)
 
-        if not hay_riesgo:
-            return EvaluationResponse(
-                hay_riesgo=False,
-                conclusion_diagnostica=(
-                    "Sin riesgo cardiovascular significativo detectado. "
-                    "Todos los fenotipos se encuentran dentro de los límites de seguridad."
-                ),
-                nivel_prioridad="BAJA",
-                tipos_riesgo=tipos_riesgo,
-                factores_clave=[],
-                recomendacion_preventiva=(
-                    "Continuar con controles habituales de Atención Primaria según protocolo general."
-                ),
-                perfil_renal=perfil_renal,
-            )
-
-        # Explicar cada fenotipo con el TreeExplainer de su propio clasificador.
+        # Explicar con TreeSHAP real: si hay alertas activas, priorizar los modelos en alerta;
+        # si no hay alertas (paciente bajo control), ejecutar TreeSHAP sobre los 3 modelos para
+        # mostrar factores protectores o parámetros limítrofes al médico de Atención Primaria.
         factor_candidates = []
         for risk_name, is_alert in (
             ("riesgo_aterosclerotico", ath_alert),
             ("riesgo_insuficiencia_cardiaca", hf_alert),
             ("riesgo_cardiorrenal", ren_alert),
         ):
-            if not is_alert:
+            if hay_riesgo and not is_alert:
                 continue
             explainer = self.explainers[risk_name]
             service = ShapService(explainer=explainer, feature_names=self.feature_names)
@@ -214,8 +200,25 @@ class ModelService:
             key=lambda factor: abs(float(factor.impacto.rstrip("%").replace("+", ""))),
             reverse=True,
         )[:3]
+
+        if not hay_riesgo:
+            return EvaluationResponse(
+                hay_riesgo=False,
+                conclusion_diagnostica=(
+                    "Sin riesgo cardiovascular significativo detectado. "
+                    "Todos los fenotipos se encuentran dentro de los límites de seguridad."
+                ),
+                nivel_prioridad="BAJA",
+                tipos_riesgo=tipos_riesgo,
+                factores_clave=factores_clave,
+                recomendacion_preventiva=(
+                    "Continuar con controles habituales de Atención Primaria según protocolo general."
+                ),
+                perfil_renal=perfil_renal,
+            )
+
         conclusion, recomendacion, prioridad = self._synthesize_verdict(
-            ath_alert, hf_alert, ren_alert, features
+            ath_alert, hf_alert, ren_alert, features, probs=probs, perfil_renal=perfil_renal
         )
 
         return EvaluationResponse(
@@ -254,6 +257,8 @@ class ModelService:
         hf_alert: bool,
         ren_alert: bool,
         features: Dict[str, Any],
+        probs: Optional[Dict[str, float]] = None,
+        perfil_renal: Optional[PerfilRenalKDIGO] = None,
     ) -> tuple[str, str, str]:
         recs = []
         conclusions = []
@@ -267,7 +272,7 @@ class ModelService:
                 )
                 prioridad = "ALTA"
             else:
-                conclusions.append("Compromiso cardiorrenal incipiente (función renal/albuminuria)")
+                conclusions.append("Compromiso cardiorrenal activo (función renal/albuminuria)")
             recs.append(
                 "Confirmar cociente UACR en 3 meses y valorar optimización de nefroprotección (iSGLT2 / ARA-II)."
             )
@@ -279,6 +284,14 @@ class ModelService:
         if ath_alert:
             conclusions.append("Riesgo aterosclerótico aumentado (ASCVD)")
             recs.append("Optimizar control lipídico hacia c-LDL objetivo y deshabituación tabáquica si procede.")
+
+        # Criterios clínicos de Atención Primaria para triaje de Prioridad ALTA en Modo A y Modo B:
+        max_prob = max(probs.values()) if probs else 0.0
+        kdigo_severe = perfil_renal is not None and perfil_renal.cuadrante_kdigo in ("ALTO", "MUY_ALTO")
+        hta_severa = float(features.get("ap_hi", 120.0)) >= 165.0 or float(features.get("ap_lo", 80.0)) >= 100.0
+        triple_alerta = ath_alert and hf_alert and ren_alert
+        if kdigo_severe or max_prob >= 0.45 or triple_alerta or hta_severa:
+            prioridad = "ALTA"
 
         conclusion_txt = (
             f"Alerta de riesgo detectada: {', '.join(conclusions)}."

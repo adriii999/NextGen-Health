@@ -1,10 +1,11 @@
 """
-Pipeline de Limpieza, Armonización, Filtrado Fisiológico y Síntesis Cardiorrenal (KDIGO).
+Pipeline de Limpieza, Armonización, Filtrado Fisiológico y Síntesis Cardiorrenal (KDIGO 2024).
 Integra tres fuentes de datos en data/raw/:
 1. NutriSynthCare España (db_cardiabetes.csv)
 2. Kaggle Cardiovascular Disease Dataset (cardio_train.csv)
-3. CDC NHANES (demographic, examination, labs, questionnaire) con eGFR (CKD-EPI 2021) y UACR reales.
-Genera el dataset enriquecido para entrenamiento y validación en data/processed/dataset_preprocessed.csv.
+3. CDC NHANES (demographic, examination, labs, questionnaire) con eGFR (CKD-EPI 2021), UACR
+   y desenlaces clínicos reales por fenotipo (MCQ160B Insuficiencia Cardíaca, MCQ160C/D/E ASCVD).
+Genera el dataset enriquecido para entrenamiento y validación en data/processed/dataset.csv.
 """
 from pathlib import Path
 from typing import Optional
@@ -41,19 +42,23 @@ ALL_COLUMNS = ORDERED_FEATURES + [
 
 def filter_physiological_outliers(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Aplica filtros estrictos para eliminar errores de medición y valores incompatibles con la vida:
+    Aplica filtros estrictos de Atención Primaria para eliminar errores de medición
+    y valores incompatibles con la fisiología humana ambulatoria:
     1. Presión sistólica (ap_hi) en [80, 220] mmHg.
     2. Presión diastólica (ap_lo) en [50, 130] mmHg.
     3. Condición hemodinámica: ap_lo < ap_hi.
-    4. Índice de masa corporal (bmi) en [15.0, 60.0] kg/m².
-    5. Edad en [30.0, 85.0] años si la columna está presente.
+    4. Presión de pulso (PP = ap_hi - ap_lo) en [15, 130] mmHg.
+    5. Índice de masa corporal (bmi) en [15.0, 60.0] kg/m².
+    6. Edad en [30.0, 85.0] años si la columna está presente.
     """
     initial_len = len(df)
-    
+    pulse_pressure = df["ap_hi"] - df["ap_lo"]
+
     mask = (
         (df["ap_hi"] >= 80.0) & (df["ap_hi"] <= 220.0) &
         (df["ap_lo"] >= 50.0) & (df["ap_lo"] <= 130.0) &
         (df["ap_lo"] < df["ap_hi"]) &
+        (pulse_pressure >= 15.0) & (pulse_pressure <= 130.0) &
         (df["bmi"] >= 15.0) & (df["bmi"] <= 60.0)
     )
 
@@ -66,7 +71,7 @@ def filter_physiological_outliers(df: pd.DataFrame) -> pd.DataFrame:
     cleaned = df[mask].copy().reset_index(drop=True)
     dropped = initial_len - len(cleaned)
     if dropped > 0:
-        print(f" * Filtro fisiológico: {dropped} registros atípicos eliminados ({initial_len} -> {len(cleaned)}).")
+        print(f" * Filtro fisiológico (incl. presión de pulso): {dropped} registros atípicos eliminados ({initial_len} -> {len(cleaned)}).")
     return cleaned
 
 
@@ -87,7 +92,7 @@ def map_cholesterol_to_continuous(cat_series: pd.Series, random_seed: int = 42) 
     continuous[mask1] = rng.uniform(145.0, 198.0, size=mask1.sum())
     continuous[mask2] = rng.uniform(200.0, 238.0, size=mask2.sum())
     continuous[mask3] = rng.uniform(240.0, 315.0, size=mask3.sum())
-    
+
     mask_other = ~(mask1 | mask2 | mask3)
     if mask_other.sum() > 0:
         continuous[mask_other] = rng.uniform(170.0, 210.0, size=mask_other.sum())
@@ -97,10 +102,13 @@ def map_cholesterol_to_continuous(cat_series: pd.Series, random_seed: int = 42) 
 
 def extract_nhanes_data() -> pd.DataFrame:
     """
-    Extrae, valida y calcula biomarcadores renales reales desde la cohorte CDC NHANES:
+    Extrae, valida y calcula biomarcadores renales y desenlaces reales desde la cohorte CDC NHANES:
     - eGFR calculado a partir de creatinina sérica real usando CKD-EPI 2021 (sin componente racial).
-    - uACR medido directamente en análisis de laboratorio de orina (URDACT, mg/g).
+    - uACR medido directamente en análisis de laboratorio de orina (URDACT, mg/g) preservando macroalbuminuria A3.
     - Colesterol total sérico continuo en mg/dL.
+    - Desenlaces clínicos reales desglosados:
+      * real_hf: MCQ160B == 1 (Insuficiencia cardíaca congestiva diagnosticada).
+      * real_ascvd: MCQ160C == 1 (Coronariopatía) | MCQ160D == 1 (Angina) | MCQ160E == 1 (Infarto).
     """
     if not NHANES_DIR.exists():
         return pd.DataFrame()
@@ -131,9 +139,15 @@ def extract_nhanes_data() -> pd.DataFrame:
     kappa = np.where(is_female, 0.7, 0.9)
     alpha = np.where(is_female, -0.241, -0.302)
     gender_factor = np.where(is_female, 1.012, 1.0)
-    scr = valid["LBXSCR"].to_numpy()
+    scr = np.maximum(valid["LBXSCR"].to_numpy(), 0.2)
     age = valid["RIDAGEYR"].to_numpy()
-    egfr = 142 * (np.minimum(scr / kappa, 1.0) ** alpha) * (np.maximum(scr / kappa, 1.0) ** (-1.200)) * (0.9938 ** age) * gender_factor
+    egfr = (
+        142.0
+        * (np.minimum(scr / kappa, 1.0) ** alpha)
+        * (np.maximum(scr / kappa, 1.0) ** (-1.200))
+        * (0.9938 ** age)
+        * gender_factor
+    )
 
     # Tabaquismo activo
     fuma = ((valid["SMQ020"] == 1) & (valid["SMQ040"].isin([1, 2]))).astype(int)
@@ -141,8 +155,10 @@ def extract_nhanes_data() -> pd.DataFrame:
     # Diabetes (diagnóstico clínico o glucosa basal en ayunas >= 126 mg/dL)
     diabetes = ((valid["DIQ010"] == 1) | (valid["LBXSGL"] >= 126.0)).astype(int)
 
-    # Evento cardiovascular reportado (insuficiencia cardíaca, infarto, angina o enfermedad coronaria)
-    target = ((valid["MCQ160B"] == 1) | (valid["MCQ160C"] == 1) | (valid["MCQ160D"] == 1) | (valid["MCQ160E"] == 1)).astype(int)
+    # Desenlaces clínicos reales por fenotipo en NHANES
+    real_hf = (valid["MCQ160B"] == 1).astype(int)
+    real_ascvd = ((valid["MCQ160C"] == 1) | (valid["MCQ160D"] == 1) | (valid["MCQ160E"] == 1)).astype(int)
+    target = np.maximum(real_hf, real_ascvd).astype(int)
 
     nhanes_harmonized = pd.DataFrame({
         "edad": valid["RIDAGEYR"].astype(float),
@@ -153,12 +169,18 @@ def extract_nhanes_data() -> pd.DataFrame:
         "colesterol_total": np.round(valid["LBXSCH"].astype(float), 1),
         "fuma": fuma,
         "diabetes": diabetes,
-        "egfr": np.round(np.clip(egfr, 15.0, 125.0), 1),
-        "uacr": np.round(np.clip(valid["URDACT"].to_numpy(), 3.0, 380.0), 1),
-        "target_cardio": target
+        "egfr": np.round(np.clip(egfr, 5.0, 150.0), 1),
+        "uacr": np.round(np.clip(valid["URDACT"].to_numpy(), 1.0, 3000.0), 1),
+        "target_cardio": target,
+        "real_ascvd": real_ascvd,
+        "real_hf": real_hf,
+        "source_weight": np.full(len(valid), 3.0, dtype=float),
     })
 
-    print(f" * CDC NHANES procesado: {len(nhanes_harmonized)} registros clínicos reales con eGFR y UACR.")
+    print(
+        f" * CDC NHANES procesado: {len(nhanes_harmonized)} registros clínicos reales "
+        f"(ASCVD={int(real_ascvd.sum())}, IC={int(real_hf.sum())})."
+    )
     return nhanes_harmonized
 
 
@@ -167,7 +189,7 @@ def clean_and_harmonize_data(random_seed: int = 42) -> pd.DataFrame:
     Carga, unifica y normaliza las tres fuentes crudas:
     1. NutriSynthCare España (db_cardiabetes.csv)
     2. Kaggle Cardiovascular Disease Dataset (cardio_train.csv)
-    3. CDC NHANES (cohorte real con eGFR y UACR medidos)
+    3. CDC NHANES (cohorte real con eGFR, UACR y diagnósticos por subtipo)
     """
     dfs = []
     rng = np.random.default_rng(random_seed)
@@ -176,11 +198,10 @@ def clean_and_harmonize_data(random_seed: int = 42) -> pd.DataFrame:
     if NUTRISYNTHCARE_FILE.exists():
         print(f"Cargando NutriSynthCare desde: {NUTRISYNTHCARE_FILE}")
         df_es = pd.read_csv(NUTRISYNTHCARE_FILE)
-        
+
         sexo_map = {"Hombre": 2, "Mujer": 1, 2: 2, 1: 1}
         target_map = {"Bajo": 0, "Riesgo Elevado": 1, 0: 0, 1: 1}
 
-        # Imputar tabaquismo con prevalencia española (~22% población adulta)
         p_smoke = np.where(df_es["Riesgo_Cardiovascular"] == "Riesgo Elevado", 0.28, 0.16)
         smoke_es = (rng.random(len(df_es)) < p_smoke).astype(int)
 
@@ -193,7 +214,10 @@ def clean_and_harmonize_data(random_seed: int = 42) -> pd.DataFrame:
             "colesterol_total": df_es["Colesterol_Total"].astype(float),
             "fuma": smoke_es,
             "diabetes": df_es["Diabetes"].astype(int),
-            "target_cardio": df_es["Riesgo_Cardiovascular"].map(target_map).fillna(0).astype(int)
+            "target_cardio": df_es["Riesgo_Cardiovascular"].map(target_map).fillna(0).astype(int),
+            "real_ascvd": np.nan,
+            "real_hf": np.nan,
+            "source_weight": np.full(len(df_es), 0.8, dtype=float),
         })
         dfs.append(harmonized_es)
         print(f" * NutriSynthCare procesado: {len(harmonized_es)} registros.")
@@ -202,7 +226,7 @@ def clean_and_harmonize_data(random_seed: int = 42) -> pd.DataFrame:
     if KAGGLE_CVD_FILE.exists():
         print(f"Cargando Kaggle CVD desde: {KAGGLE_CVD_FILE}")
         df_cvd = pd.read_csv(KAGGLE_CVD_FILE, sep=";")
-        
+
         edad_anios = df_cvd["age"] / 365.25
         height_m = df_cvd["height"] / 100.0
         bmi_calc = df_cvd["weight"] / (height_m ** 2)
@@ -218,12 +242,15 @@ def clean_and_harmonize_data(random_seed: int = 42) -> pd.DataFrame:
             "colesterol_total": col_continuo,
             "fuma": df_cvd["smoke"].astype(int),
             "diabetes": diabetes_cvd,
-            "target_cardio": df_cvd["cardio"].astype(int)
+            "target_cardio": df_cvd["cardio"].astype(int),
+            "real_ascvd": np.nan,
+            "real_hf": np.nan,
+            "source_weight": np.full(len(df_cvd), 1.0, dtype=float),
         })
         dfs.append(harmonized_cvd)
         print(f" * Kaggle CVD procesado: {len(harmonized_cvd)} registros.")
 
-    # 3. Cargar CDC NHANES (datos reales de función renal y orina)
+    # 3. Cargar CDC NHANES (datos reales de función renal, orina y eventos clínicos)
     nhanes_df = extract_nhanes_data()
     if not nhanes_df.empty:
         dfs.append(nhanes_df)
@@ -234,23 +261,26 @@ def clean_and_harmonize_data(random_seed: int = 42) -> pd.DataFrame:
     combined_df = pd.concat(dfs, ignore_index=True)
     print(f"Total registros brutos combinados: {len(combined_df)}")
 
-    # Aplicar filtrado de atípicos fisiológicos
     cleaned_df = filter_physiological_outliers(combined_df)
     return cleaned_df
 
 
 def synthesize_cardiorenal_and_deltas(base_df: pd.DataFrame, random_seed: int = 42) -> pd.DataFrame:
     """
-    Completa biomarcadores renales (eGFR y UACR), genera trayectorias longitudinales (Deltas)
-    fisiológicas continuas y modela el riesgo cardiovascular y cardiorrenal multidimensional
-    mediante funciones logísticas continuas alineadas con guías clínicas (SCORE2 / KDIGO 2024 / Framingham).
-    
-    Inyecta exactamente un 25% de valores NaN en deltas para entrenar la dualidad clínica
-    (Modo A: analítica aislada vs Modo B: seguimiento longitudinal).
+    Completa biomarcadores renales (eGFR y UACR) cuando no están medidos, genera trayectorias
+    longitudinales (Deltas T-1 -> T) garantizando coherencia fisiológica estricta del estado en T-1,
+    y modela los tres fenotipos clínicos (ASCVD, Insuficiencia Cardíaca, Cardiorrenal) respetando
+    el Ground Truth clínico real de NHANES y Kaggle CVD.
     """
     rng = np.random.default_rng(random_seed)
     n = len(base_df)
     df = base_df.copy().reset_index(drop=True)
+
+    orig_cardio = df["target_cardio"].fillna(0).astype(int).to_numpy()
+    real_ascvd = df["real_ascvd"].to_numpy() if "real_ascvd" in df.columns else np.full(n, np.nan)
+    real_hf = df["real_hf"].to_numpy() if "real_hf" in df.columns else np.full(n, np.nan)
+    if "source_weight" not in df.columns:
+        df["source_weight"] = 1.0
 
     # --------------------------------------------------------------------------
     # 1. eGFR (Tasa de Filtración Glomerular estimada, mL/min/1.73m²)
@@ -264,12 +294,14 @@ def synthesize_cardiorenal_and_deltas(base_df: pd.DataFrame, random_seed: int = 
         sub_age = df.loc[mask_need_egfr, "edad"].to_numpy()
         sub_diab = df.loc[mask_need_egfr, "diabetes"].to_numpy()
         sub_ap_hi = df.loc[mask_need_egfr, "ap_hi"].to_numpy()
+        sub_cardio = orig_cardio[mask_need_egfr.to_numpy()]
 
-        base_egfr = 98.0 - 0.75 * np.maximum(0.0, sub_age - 30.0)
-        penalty_diabetes = np.where(sub_diab == 1, rng.uniform(8.0, 18.0, size=sub_n), 0.0)
-        penalty_hta = np.where(sub_ap_hi >= 140.0, rng.uniform(5.0, 14.0, size=sub_n), 0.0)
-        noise_egfr = rng.normal(0.0, 4.0, size=sub_n)
-        egfr_synth = base_egfr - penalty_diabetes - penalty_hta + noise_egfr
+        base_egfr = 98.0 - 0.72 * np.maximum(0.0, sub_age - 30.0)
+        penalty_diabetes = np.where(sub_diab == 1, rng.uniform(7.0, 17.0, size=sub_n), 0.0)
+        penalty_hta = np.where(sub_ap_hi >= 140.0, rng.uniform(4.0, 13.0, size=sub_n), 0.0)
+        penalty_cardio = np.where(sub_cardio == 1, rng.uniform(3.0, 10.0, size=sub_n), 0.0)
+        noise_egfr = rng.normal(0.0, 4.5, size=sub_n)
+        egfr_synth = base_egfr - penalty_diabetes - penalty_hta - penalty_cardio + noise_egfr
         df.loc[mask_need_egfr, "egfr"] = np.round(np.clip(egfr_synth, 15.0, 125.0), 1)
 
     # --------------------------------------------------------------------------
@@ -283,50 +315,84 @@ def synthesize_cardiorenal_and_deltas(base_df: pd.DataFrame, random_seed: int = 
         sub_n = int(mask_need_uacr.sum())
         sub_diab = df.loc[mask_need_uacr, "diabetes"].to_numpy()
         sub_ap_hi = df.loc[mask_need_uacr, "ap_hi"].to_numpy()
+        sub_cardio = orig_cardio[mask_need_uacr.to_numpy()]
 
-        uacr_normal = rng.lognormal(mean=2.2, sigma=0.45, size=sub_n)
-        uacr_high = rng.uniform(32.0, 140.0, size=sub_n)
-        prob_micro = np.where(sub_diab == 1, 0.40, 0.12)
-        prob_micro = np.where(sub_ap_hi >= 145.0, prob_micro + 0.20, prob_micro)
-
+        uacr_normal = rng.lognormal(mean=2.15, sigma=0.45, size=sub_n)
+        uacr_high = rng.uniform(30.0, 145.0, size=sub_n)
+        prob_micro = (
+            0.08
+            + np.where(sub_diab == 1, 0.30, 0.0)
+            + np.where(sub_ap_hi >= 140.0, 0.16, 0.0)
+            + np.where(sub_cardio == 1, 0.14, 0.0)
+        )
         draw = rng.random(sub_n)
         uacr_final = np.where(draw < prob_micro, uacr_high, uacr_normal)
-        df.loc[mask_need_uacr, "uacr"] = np.round(np.clip(uacr_final, 3.0, 380.0), 1)
+        df.loc[mask_need_uacr, "uacr"] = np.round(np.clip(uacr_final, 2.0, 450.0), 1)
 
     # --------------------------------------------------------------------------
-    # 3. GENERACIÓN DE DELTAS LONGITUDINALES (Progresión interanual T-1 -> T)
+    # 3. GENERACIÓN VECTORIZADA DE DELTAS CON COHERENCIA FISIOLÓGICA EN T-1
     # --------------------------------------------------------------------------
-    delta_egfr = np.zeros(n)
-    delta_uacr = np.zeros(n)
-    delta_ap_hi = np.zeros(n)
-    delta_col = np.zeros(n)
-    delta_bmi = np.zeros(n)
+    diab_arr = df["diabetes"].to_numpy()
+    ap_arr = df["ap_hi"].to_numpy()
+    uacr_arr = df["uacr"].to_numpy()
+    egfr_arr = df["egfr"].to_numpy()
+    col_arr = df["colesterol_total"].to_numpy()
+    bmi_arr = df["bmi"].to_numpy()
 
-    for i in range(n):
-        diab_i = df.iloc[i]["diabetes"]
-        ap_i = df.iloc[i]["ap_hi"]
-        uacr_i = df.iloc[i]["uacr"]
+    is_progressor = (
+        ((diab_arr == 1) & (uacr_arr >= 28.0))
+        | (ap_arr >= 150.0)
+        | ((orig_cardio == 1) & (rng.random(n) < 0.35))
+        | (rng.random(n) < 0.12)
+    )
 
-        # Deterioro vascular/renal acelerado en presencia de comorbilidad metabólica
-        is_high_risk = (diab_i == 1 and uacr_i > 30.0) or ap_i >= 150.0 or (rng.random() < 0.22)
-        if is_high_risk:
-            delta_egfr[i] = rng.normal(loc=-7.5, scale=3.2)
-            delta_uacr[i] = rng.uniform(8.0, 35.0)
-            delta_ap_hi[i] = rng.normal(loc=5.5, scale=4.0)
-            delta_col[i] = rng.normal(loc=4.0, scale=7.0)
-            delta_bmi[i] = rng.normal(loc=0.6, scale=0.5)
-        else:
-            delta_egfr[i] = rng.normal(loc=-1.1, scale=1.4)
-            delta_uacr[i] = rng.normal(loc=0.5, scale=2.5)
-            delta_ap_hi[i] = rng.normal(loc=0.5, scale=3.0)
-            delta_col[i] = rng.normal(loc=-1.0, scale=5.0)
-            delta_bmi[i] = rng.normal(loc=0.0, scale=0.3)
+    raw_delta_egfr = np.where(
+        is_progressor,
+        rng.normal(loc=-7.2, scale=3.0, size=n),
+        rng.normal(loc=-1.0, scale=1.3, size=n),
+    )
+    raw_delta_uacr = np.where(
+        is_progressor,
+        rng.uniform(6.0, 32.0, size=n),
+        rng.normal(loc=0.4, scale=2.2, size=n),
+    )
+    raw_delta_ap_hi = np.where(
+        is_progressor,
+        rng.normal(loc=5.0, scale=3.8, size=n),
+        rng.normal(loc=0.4, scale=2.8, size=n),
+    )
+    raw_delta_col = np.where(
+        is_progressor,
+        rng.normal(loc=3.5, scale=6.5, size=n),
+        rng.normal(loc=-1.0, scale=4.8, size=n),
+    )
+    raw_delta_bmi = np.where(
+        is_progressor,
+        rng.normal(loc=0.5, scale=0.45, size=n),
+        rng.normal(loc=0.0, scale=0.3, size=n),
+    )
 
-    df["delta_egfr"] = np.round(delta_egfr, 1)
-    df["delta_uacr"] = np.round(delta_uacr, 1)
-    df["delta_ap_hi"] = np.round(delta_ap_hi, 1)
-    df["delta_colesterol"] = np.round(delta_col, 1)
-    df["delta_bmi"] = np.round(delta_bmi, 1)
+    # Acotar deltas para que el estado implícito en T-1 (X_{T-1} = X_T - delta_X) sea 100% fisiológico:
+    # - uACR_{T-1} >= 1.5 mg/g -> delta_uacr <= uacr_T - 1.5
+    max_valid_delta_uacr = np.maximum(0.0, uacr_arr - 1.5)
+    min_valid_delta_uacr = np.maximum(-40.0, uacr_arr - 2950.0)
+    delta_uacr = np.round(np.clip(raw_delta_uacr, min_valid_delta_uacr, max_valid_delta_uacr), 1)
+
+    # - 5.5 <= eGFR_{T-1} <= 148.0 -> (egfr_T - 148.0) <= delta_egfr <= (egfr_T - 5.5)
+    min_valid_delta_egfr = egfr_arr - 148.0
+    max_valid_delta_egfr = egfr_arr - 5.5
+    delta_egfr = np.round(np.clip(raw_delta_egfr, min_valid_delta_egfr, max_valid_delta_egfr), 1)
+
+    # - 82.0 <= ap_hi_{T-1} <= 218.0
+    delta_ap_hi = np.round(np.clip(raw_delta_ap_hi, ap_arr - 218.0, ap_arr - 82.0), 1)
+    delta_col = np.round(np.clip(raw_delta_col, col_arr - 440.0, col_arr - 85.0), 1)
+    delta_bmi = np.round(np.clip(raw_delta_bmi, bmi_arr - 58.0, bmi_arr - 15.5), 1)
+
+    df["delta_egfr"] = delta_egfr
+    df["delta_uacr"] = delta_uacr
+    df["delta_ap_hi"] = delta_ap_hi
+    df["delta_colesterol"] = delta_col
+    df["delta_bmi"] = delta_bmi
 
     # --------------------------------------------------------------------------
     # 4. INYECCIÓN DE NULLS (25% de pacientes sin histórico previo = Modo A)
@@ -336,56 +402,68 @@ def synthesize_cardiorenal_and_deltas(base_df: pd.DataFrame, random_seed: int = 
     df.loc[mask_missing, delta_cols] = np.nan
 
     # --------------------------------------------------------------------------
-    # 5. MODELADO DE RIESGO CLÍNICO CONTINUO Y MUESTREO DE BERNOULLI
+    # 5. ESTRATIFICACIÓN FENOTÍPICA CON RESPETO AL GROUND TRUTH CLÍNICO REAL
     # --------------------------------------------------------------------------
-    # A) Fenotipo Aterosclerótico (ASCVD / Placa / Isquemia):
+    # A) Fenotipo Aterosclerótico (ASCVD / Placa / Isquemia - SCORE2 / ESC):
     logit_ath = (
-        -3.8
-        + 0.045 * (df["edad"] - 50.0)
-        + 0.028 * (df["ap_hi"] - 120.0)
-        + 0.016 * (df["colesterol_total"] - 190.0)
-        + 0.75 * df["fuma"]
-        + 0.65 * df["diabetes"]
-        + 0.03 * df["delta_ap_hi"].fillna(0.0)
-        + 0.02 * df["delta_colesterol"].fillna(0.0)
+        -3.65
+        + 0.042 * (df["edad"] - 50.0)
+        + 0.026 * (df["ap_hi"] - 120.0)
+        + 0.015 * (df["colesterol_total"] - 190.0)
+        + 0.72 * df["fuma"]
+        + 0.62 * df["diabetes"]
+        + 0.028 * df["delta_ap_hi"].fillna(0.0)
+        + 0.018 * df["delta_colesterol"].fillna(0.0)
+        + 0.45 * orig_cardio
     )
     p_ath = 1.0 / (1.0 + np.exp(-logit_ath))
     y_ath = (rng.random(n) < p_ath).astype(int)
+    # Respetar diagnósticos reales de ASCVD en NHANES (MCQ160C/D/E)
+    y_ath = np.where(real_ascvd == 1, 1, y_ath)
     df["target_aterosclerotico"] = y_ath
 
-    # B) Fenotipo Insuficiencia Cardíaca (Sobrecarga hemodinámica / cardiometabólica):
+    # B) Fenotipo Insuficiencia Cardíaca (Sobrecarga hemodinámica / PREVENT-HF):
     logit_hf = (
-        -3.9
-        + 0.04 * (df["edad"] - 50.0)
-        + 0.03 * (df["ap_hi"] - 120.0)
-        + 0.075 * (df["bmi"] - 25.0)
-        + 0.70 * df["diabetes"]
-        - 0.025 * (df["egfr"] - 75.0)
-        + 0.04 * df["delta_ap_hi"].fillna(0.0)
-        + 0.15 * df["delta_bmi"].fillna(0.0)
+        -3.75
+        + 0.038 * (df["edad"] - 50.0)
+        + 0.028 * (df["ap_hi"] - 120.0)
+        + 0.070 * (df["bmi"] - 25.0)
+        + 0.68 * df["diabetes"]
+        - 0.024 * (df["egfr"] - 75.0)
+        + 0.038 * df["delta_ap_hi"].fillna(0.0)
+        + 0.14 * df["delta_bmi"].fillna(0.0)
+        + 0.45 * orig_cardio
     )
     p_hf = 1.0 / (1.0 + np.exp(-logit_hf))
     y_hf = (rng.random(n) < p_hf).astype(int)
+    # Respetar diagnósticos reales de Insuficiencia Cardíaca en NHANES (MCQ160B)
+    y_hf = np.where(real_hf == 1, 1, y_hf)
     df["target_insuficiencia_cardiaca"] = y_hf
 
     # C) Fenotipo Cardiorrenal (KDIGO 2024 / Deterioro silente / Albuminuria):
     logit_cr = (
-        -3.2
-        - 0.045 * (df["egfr"] - 75.0)
-        + 0.022 * (df["uacr"] - 20.0)
+        -3.15
+        - 0.044 * (df["egfr"] - 75.0)
+        + 0.022 * np.minimum(df["uacr"], 250.0) - 0.44
         - 0.22 * df["delta_egfr"].fillna(0.0)
         + 0.035 * df["delta_uacr"].fillna(0.0)
-        + 0.75 * df["diabetes"]
-        + 0.018 * (df["ap_hi"] - 120.0)
+        + 0.72 * df["diabetes"]
+        + 0.016 * (df["ap_hi"] - 120.0)
+        + 0.30 * orig_cardio
     )
     p_cr = 1.0 / (1.0 + np.exp(-logit_cr))
     y_cr = (rng.random(n) < p_cr).astype(int)
+    # En NHANES, daño renal KDIGO de alto riesgo real (G3b-G5 o macroalbuminuria A3) es positivo real
+    is_nhanes = ~np.isnan(real_ascvd)
+    real_severe_ckd = is_nhanes & ((df["egfr"] < 45.0) | (df["uacr"] >= 200.0))
+    y_cr = np.where(real_severe_ckd, 1, y_cr)
     df["target_cardiorrenal"] = y_cr
 
     # D) Target cardio global compuesto:
     df["target_cardio"] = np.maximum(y_ath, np.maximum(y_hf, y_cr))
 
-    return df[ALL_COLUMNS]
+    output_cols = ALL_COLUMNS + (["source_weight"] if "source_weight" in df.columns else [])
+    return df[output_cols]
 
 
 def run_data_preparation(output_path: Optional[Path] = None, random_seed: int = 42) -> pd.DataFrame:
@@ -398,13 +476,9 @@ def run_data_preparation(output_path: Optional[Path] = None, random_seed: int = 
     print(" Fuentes: NutriSynthCare (España) + Kaggle CVD + CDC NHANES")
     print("=" * 65)
 
-    # 1. Armonización y filtrado
     cleaned_df = clean_and_harmonize_data(random_seed=random_seed)
-
-    # 2. Síntesis cardiorrenal y deltas
     final_df = synthesize_cardiorenal_and_deltas(cleaned_df, random_seed=random_seed)
 
-    # 3. Guardar archivo
     final_df.to_csv(target_out, index=False)
     print(f"\n[OK] Dataset guardado en: {target_out}")
     if target_out == OUTPUT_FILE and RAW_OUTPUT_FILE.parent.exists():
