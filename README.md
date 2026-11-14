@@ -1,6 +1,6 @@
 # NextGen Health: Segunda Opinión Multidimensional de Riesgo Cardiovascular (Dual: Aislada y Progresión)
 
-Herramienta clínica de demostración (MVP) para **Atención Primaria**, diseñada para proporcionar una **segunda opinión en un solo clic** analizando archivos de analíticas depositados en una carpeta, identificando señales de riesgo cardiovascular oculto mediante una **arquitectura de evaluación dual**: analítica aislada (foto fija) y progresión temporal ($\Delta$).
+Herramienta clínica de demostración (MVP) para **Atención Primaria**, diseñada para proporcionar una **segunda opinión en un solo clic** analizando archivos de analíticas depositados en una carpeta, identificando señales de riesgo cardiovascular oculto mediante una **arquitectura de evaluación dual** (analítica aislada y progresión temporal $\Delta$) y **explicabilidad médica transparente con SHAP**.
 
 > **Estado:** Prototipo funcional (demo ligera sin base de datos) desarrollado para el Datathon.
 
@@ -21,34 +21,27 @@ El sistema implementa dos modos de evaluación automáticos:
 
 ---
 
-## 🚀 Flujo de Uso en la Demo
+## 🧠 ¿Para qué sirve SHAP (XAI) en este proyecto?
 
-* **Flujo Principal ("Analizar Carpeta"):** Con un clic en `POST /api/analiticas/analizar-carpeta`, el sistema procesa todas las analíticas de `data/analiticas/`, detectando automáticamente si cada caso es una foto aislada o incluye progresión previa, ordenando por severidad.
-* **Simulador Manual ("Demo"):** Formulario interactivo en `POST /api/predict` con interruptor opcional para añadir histórico previo y ver cómo reaccionan las alertas de riesgo.
-* **Valores de Laboratorio Continuos:** El colesterol se modela en su valor analítico real continuo en **mg/dL** (120–350 mg/dL).
-* **Salida Multidimensional por Tipos de Riesgo:**
-  1. **Riesgo Aterosclerótico (ASCVD):** Infarto e ictus por dislipemia continua, HTA sistólica y tabaquismo.
-  2. **Riesgo de Insuficiencia Cardíaca (IC):** Sobrecarga metabólica y descompensación tensional/peso ($\Delta$).
-  3. **Riesgo Cardiorrenal:** Caída acelerada de filtrado glomerular (`delta_egfr`) y microalbuminuria creciente (`delta_uacr`).
-  * **Criterio de corte:** Si ningún fenotipo supera su umbral clínico, el sistema concluye: *"Sin riesgo significativo detectado (perfil bajo control)"*.
+Un modelo de Machine Learning que emite solo un número (ej. *"Riesgo: 82%"*) es una **caja negra** que ningún médico de Atención Primaria utilizaría. 
+
+La librería **`shap` (`TreeExplainer`)** se utiliza para:
+1. **Abrir la caja negra:** Calcula la aportación matemática exacta de cada variable clínica al riesgo estimado.
+2. **Generar los Factores Clave (`factores_clave`):** Traduce los valores matemáticos en impactos porcentuales comprensibles para el doctor (ej. *"La pérdida de eGFR de -14 mL/min/año aporta un +18% al riesgo"* o *"El colesterol total aporta un +6%"*).
+3. **Guiar la Recomendación Médica:** Permite que el sistema emita una intervención preventiva dirigida a la causa raíz (ej. nefroprotección con iSGLT2 ante empeoramiento de UACR/eGFR).
 
 ---
 
-## 📊 Fuentes de Datos y Variables
+## 🛠️ Stack Tecnológico y Librerías
 
-1. **Fuente 1 (Población España):** [NutriSynthCare](https://www.kaggle.com/datasets/danicruzdevtech/datasets-sintticos-de-salud-diabetes-cardio).
-2. **Fuente 2 (Calibración masiva):** [Cardiovascular Disease Dataset (Kaggle)](https://www.kaggle.com/datasets/sulianova/cardiovascular-disease-dataset).
-3. **Síntesis Longitudinal Calibrada:** Generación de deltas interanuales según KDIGO/ESC.
-
-> **Nota:** La columna `target_cardio` solo se utiliza en los CSV de entrenamiento para supervisar el aprendizaje y optimizar la sensibilidad (Recall). No forma parte de la entrada de las analíticas en producción.
-
----
-
-## 🛠️ Stack Tecnológico
-
-* **Frontend:** React + Vite, Tailwind CSS, Lucide Icons y Recharts.
+* **Frontend:** React + Vite, Tailwind CSS, Lucide Icons y Recharts (para radar de 3 riesgos y barras de impacto SHAP).
 * **Backend:** FastAPI, Pydantic v2 (Python 3.10+).
-* **Machine Learning & XAI:** XGBoost (`xgboost`) con soporte nativo de `NaN`, persistencia con `joblib` y explicabilidad con `shap`.
+* **Librerías de Machine Learning & XAI:**
+  * **`xgboost`:** Clasificador de gradiente para datos tabulares con soporte nativo de valores nulos (`missing=np.nan`).
+  * **`shap`:** Librería de Inteligencia Artificial Explicable (XAI) para calcular los factores determinantes de cada predicción.
+  * **`joblib`:** Persistencia y carga en memoria de los modelos y artefactos entrenados.
+  * **`scikit-learn`:** Validación cruzada (`StratifiedKFold`) y optimización de sensibilidad (*Recall* $\ge 85\%$).
+  * **`pandas` y `numpy`:** Procesamiento de datos tabulares y cálculo de variaciones temporales.
 
 ---
 
