@@ -32,7 +32,7 @@ El dataset final unifica **tres fuentes complementarias** para cubrir todas las 
 
 ## 2. Archivo, Scripts y Validación
 
-* **Ruta del dataset:** `data/processed/dataset_preprocessed.csv`
+* **Ruta del dataset:** `data/processed/dataset.csv` (y sincronizado en `data/raw/dataset.csv`)
 * **Script generador:** `model/scripts/prepare_data.py`
 * **Script de profiling y calidad:** `scripts/validate_dataset.py`
 * **Tests unitarios automatizados:** `tests/test_prepare_data.py` y `tests/test_model_training.py`
@@ -104,7 +104,7 @@ import numpy as np
 import pandas as pd
 
 # Cargar dataset
-df = pd.read_csv("data/processed/dataset_preprocessed.csv")
+df = pd.read_csv("data/processed/dataset.csv")
 
 FEATURE_NAMES = [
     "edad", "sexo", "bmi", "ap_hi", "ap_lo",

@@ -10,7 +10,9 @@ import numpy as np
 import pandas as pd
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-DATASET_PATH = ROOT_DIR / "data" / "processed" / "dataset_preprocessed.csv"
+PROCESSED_DATASET = ROOT_DIR / "data" / "processed" / "dataset.csv"
+RAW_DATASET = ROOT_DIR / "data" / "raw" / "dataset.csv"
+DATASET_PATH = PROCESSED_DATASET if PROCESSED_DATASET.exists() else RAW_DATASET
 ARTIFACT_PATH = ROOT_DIR / "model" / "out" / "model_artifact.joblib"
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
@@ -36,7 +38,7 @@ def validate_dataset(dataset: pd.DataFrame) -> pd.DataFrame:
     if dataset.empty or len(dataset.columns) < 2:
         raise ValueError(
             "El CSV no contiene una tabla de datos. Comprueba que el dataset final "
-            "esté disponible en data/processed/dataset_preprocessed.csv."
+            "esté disponible en data/processed/dataset.csv o data/raw/dataset.csv."
         )
 
     required = [*FEATURE_COLUMNS, *TARGET_COLUMNS.values()]

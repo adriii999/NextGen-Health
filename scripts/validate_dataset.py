@@ -12,7 +12,9 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-DATASET_PATH = Path("data/processed/dataset_preprocessed.csv")
+PROCESSED_PATH = Path("data/processed/dataset.csv")
+RAW_PATH = Path("data/raw/dataset.csv")
+DATASET_PATH = PROCESSED_PATH if PROCESSED_PATH.exists() else RAW_PATH
 
 BASE_FEATURES = [
     "edad", "sexo", "bmi", "ap_hi", "ap_lo",
