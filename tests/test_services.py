@@ -60,6 +60,9 @@ def test_model_service_with_trained_model_evaluates_correctly():
     result = service.evaluate(lab)
     assert result.hay_riesgo in [True, False]
     assert result.tipos_riesgo is not None
+    assert result.perfil_renal is not None
+    assert result.perfil_renal.estadio_gfr == "G2"
+    assert result.perfil_renal.estadio_uacr == "A1"
     assert mock_model.predict_proba.called
 
 

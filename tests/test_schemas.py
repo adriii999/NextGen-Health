@@ -136,3 +136,22 @@ def test_evaluation_response_schema():
     assert resp.hay_riesgo is True
     assert resp.tipos_riesgo.riesgo_cardiorrenal.alerta is True
     assert len(resp.factores_clave) == 1
+
+
+def test_perfil_renal_kdigo_schema():
+    """Valida la inclusión de la estratificación renal oficial KDIGO 2024."""
+    from app.backend.schemas.response import PerfilRenalKDIGO
+
+    kdigo_data = {
+        "estadio_gfr": "G2",
+        "estadio_uacr": "A2",
+        "cuadrante_kdigo": "ALTO",
+        "progresor_rapido": True,
+        "descripcion_clinica": "Filtrado 68 mL/min (G2) con albuminuria A2 y progresión acelerada.",
+    }
+    perfil = PerfilRenalKDIGO(**kdigo_data)
+    assert perfil.estadio_gfr == "G2"
+    assert perfil.estadio_uacr == "A2"
+    assert perfil.progresor_rapido is True
+    assert perfil.cuadrante_kdigo == "ALTO"
+

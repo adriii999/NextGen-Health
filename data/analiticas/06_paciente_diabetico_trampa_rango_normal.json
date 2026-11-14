@@ -1,0 +1,19 @@
+{
+  "edad": 54,
+  "sexo": 1,
+  "bmi": 26.4,
+  "ap_hi": 128,
+  "ap_lo": 82,
+  "colesterol_total": 185.0,
+  "fuma": 0,
+  "diabetes": 1,
+  "egfr": 84.0,
+  "uacr": 48.0,
+  "progresion": {
+    "delta_egfr": -9.5,
+    "delta_uacr": 26.0,
+    "delta_ap_hi": 3.0,
+    "delta_colesterol": 5.0,
+    "delta_bmi": 0.4
+  }
+}
