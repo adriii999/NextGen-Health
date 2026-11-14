@@ -3,9 +3,10 @@ import React, { useState } from 'react';
 import { RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { KpiCard } from '../components/common/KpiCard';
 import { TableSkeleton } from '../components/common/TableSkeleton';
+import { PriorityPatientsSection } from '../components/folderView/PriorityPatientsSection';
 import { PatientTable } from '../components/folderView/PatientTable';
 import { PatientDrawer } from '../components/drawer/PatientDrawer';
-import { CommandMenu } from '../components/common/CommandMenu';
+import { PatientCarePlanModal } from '../components/patientCare/PatientCarePlanModal';
 import { AnalyzeFolderButton } from '../components/common/AnalyzeFolderButton';
 import { analiticasService } from '../services/analiticasService';
 import { MOCK_PATIENTS } from '../mock/patientsData';
@@ -13,16 +14,9 @@ import { MOCK_PATIENTS } from '../mock/patientsData';
 export const DashboardPage = () => {
   const [patients, setPatients] = useState(MOCK_PATIENTS);
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
+  const [carePlanPatient, setCarePlanPatient] = useState(null);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null);
-
-  // Escuchar evento global para abrir menú de comandos desde el botón del header
-  React.useEffect(() => {
-    const handleOpen = () => setIsCommandMenuOpen(true);
-    window.addEventListener('open-command-menu', handleOpen);
-    return () => window.removeEventListener('open-command-menu', handleOpen);
-  }, []);
 
   // Análisis en 1 Clic con simulación de progreso
   const handleAnalyzeFolder = async () => {
@@ -71,7 +65,7 @@ export const DashboardPage = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleAnalyzeFolder()}
-            className="px-3 py-1.5 rounded-[6px] border border-[#E3E6EB] hover:bg-[#F6F7F9] text-[#5A6573] text-[12px] font-medium transition-colors inline-flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-[6px] border border-[#E3E6EB] hover:bg-[#F6F7F9] text-[#5A6573] text-[12px] font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer"
             title="Refrescar lista de analíticas"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -138,7 +132,14 @@ export const DashboardPage = () => {
         />
       </div>
 
-      {/* Tabla de Pacientes con Skeletons durante la carga */}
+      {/* SECCIÓN "A QUIÉN MIRAR HOY": Tarjetas de Pacientes con Riesgo Oculto */}
+      <PriorityPatientsSection
+        patients={patients}
+        onSelectPatient={(p) => setSelectedPatient(p)}
+        onOpenCarePlan={(p) => setCarePlanPatient(p)}
+      />
+
+      {/* Tabla de Decisiones Clínicas (Sin scroll horizontal, etiquetas directas) */}
       {loading ? (
         <div className="bg-white rounded-[6px] border border-[#E3E6EB] p-4">
           <div className="text-[12px] font-semibold text-[#1D3B6B] mb-3 flex items-center gap-2">
@@ -151,11 +152,10 @@ export const DashboardPage = () => {
         <PatientTable
           patients={patients}
           onSelectPatient={(p) => setSelectedPatient(p)}
-          onOpenCommandMenu={() => setIsCommandMenuOpen(true)}
         />
       )}
 
-      {/* Drawer Lateral Deslizante para Detalle Clínico */}
+      {/* Drawer Lateral Deslizante para Detalle Clínico de 2ª Opinión */}
       {selectedPatient && (
         <PatientDrawer
           patient={selectedPatient}
@@ -163,13 +163,11 @@ export const DashboardPage = () => {
         />
       )}
 
-      {/* Menú de Comandos Accesible con Ctrl+K */}
-      <CommandMenu
-        isOpen={isCommandMenuOpen}
-        onClose={() => setIsCommandMenuOpen(false)}
-        patients={patients}
-        onSelectPatient={(p) => setSelectedPatient(p)}
-        onAnalyzeFolder={handleAnalyzeFolder}
+      {/* Modal de Hoja de Cuidados para el Paciente */}
+      <PatientCarePlanModal
+        isOpen={!!carePlanPatient}
+        onClose={() => setCarePlanPatient(null)}
+        patient={carePlanPatient}
       />
     </div>
   );
