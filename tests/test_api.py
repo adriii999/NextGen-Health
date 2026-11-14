@@ -94,11 +94,18 @@ def test_api_predict_invalid_blood_pressure(http_client: httpx.Client):
 
 def test_api_predict_returns_200_when_model_is_loaded(http_client: httpx.Client):
     """Verifica que con un modelo cargado en el servidor, responde con 200 OK y el contrato completo."""
-    mock_model = MagicMock()
-    mock_model.predict_proba.return_value = np.array([[0.80, 0.20]])
-
     model_service = app.state.model_service
-    model_service.model = mock_model
+    model_service.models = {}
+    model_service.explainers = {}
+    for risk_name in model_service.thresholds:
+        mock_model = MagicMock()
+        mock_model.predict_proba.return_value = np.array([[0.80, 0.20]])
+        model_service.models[risk_name] = mock_model
+        explainer = MagicMock()
+        explainer.shap_values.return_value = np.ones(
+            (1, len(model_service.feature_names))
+        )
+        model_service.explainers[risk_name] = explainer
     model_service.artifact_loaded = True
 
     payload = {
@@ -129,6 +136,8 @@ def test_api_predict_returns_200_when_model_is_loaded(http_client: httpx.Client)
         assert "conclusion_diagnostica" in data
     finally:
         # Restaurar estado original sin modelo
+        model_service.models = {}
+        model_service.explainers = {}
         model_service.model = None
         model_service.artifact_loaded = False
 

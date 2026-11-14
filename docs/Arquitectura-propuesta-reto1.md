@@ -110,7 +110,7 @@ En un entorno médico como la consulta de la Dra. Carmen, un algoritmo que actú
 | `egfr` | Filtrado Glomerular | $\text{mL/min}/1.73\text{m}^2$ (15 – 120) | Presente | Presente + **`delta_egfr`** |
 | `uacr` | Albúmina/Creatinina en orina | $\text{mg/g}$ (2 – 300) | Presente | Presente + **`delta_uacr`** |
 
-> **Variable Target (`target_cardio`):** Binaria (0/1), solo presente en los CSV históricos de entrenamiento para guiar la optimización de sensibilidad (Recall).
+> **Variables objetivo provisionales:** `target_aterosclerotico`, `target_insuficiencia_cardiaca` y `target_cardiorrenal`, cada una binaria (0/1) y presente únicamente en el CSV de entrenamiento. Los nombres se centralizan en `model/scripts/train_models.py` y deben ajustarse al esquema final. Cada etiqueta requiere una definición de evento y horizonte temporal confirmada por el equipo de datos antes de interpretar clínicamente sus resultados.
 
 ---
 

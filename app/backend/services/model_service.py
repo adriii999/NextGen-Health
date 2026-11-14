@@ -35,6 +35,8 @@ class ModelNotImplementedError(Exception):
 
 class ModelService:
     def __init__(self):
+        self.models = {}
+        self.explainers = {}
         self.model = None
         self.feature_names = DEFAULT_FEATURE_NAMES
         self.thresholds = DEFAULT_THRESHOLDS
@@ -50,28 +52,58 @@ class ModelService:
         if target_path.exists() and target_path.is_file():
             try:
                 artifact = joblib.load(target_path)
-                if isinstance(artifact, dict) and "model" in artifact:
-                    self.model = artifact["model"]
-                    self.feature_names = artifact.get("feature_names", DEFAULT_FEATURE_NAMES)
-                    self.thresholds = artifact.get("thresholds", DEFAULT_THRESHOLDS)
-                    explainer = artifact.get("explainer")
-                    self.shap_service = ShapService(explainer=explainer, feature_names=self.feature_names)
+                required_risks = set(DEFAULT_THRESHOLDS)
+                models = artifact.get("models") if isinstance(artifact, dict) else None
+                explainers = artifact.get("explainers") if isinstance(artifact, dict) else None
+                thresholds = artifact.get("thresholds") if isinstance(artifact, dict) else None
+                feature_names = artifact.get("feature_names") if isinstance(artifact, dict) else None
+                thresholds_are_valid = (
+                    isinstance(thresholds, dict)
+                    and required_risks.issubset(thresholds)
+                    and all(
+                        isinstance(thresholds[name], (int, float))
+                        and 0.0 <= float(thresholds[name]) <= 1.0
+                        for name in required_risks
+                    )
+                )
+                if (
+                    isinstance(models, dict)
+                    and required_risks.issubset(models)
+                    and isinstance(explainers, dict)
+                    and required_risks.issubset(explainers)
+                    and thresholds_are_valid
+                    and isinstance(feature_names, list)
+                    and feature_names
+                ):
+                    self.models = models
+                    self.explainers = explainers
+                    self.feature_names = feature_names
+                    self.thresholds = thresholds
+                    self.model = None
+                    self.shap_service = ShapService(
+                        explainer=None, feature_names=self.feature_names
+                    )
                     self.artifact_loaded = True
-                    print(f"[OK] Modelo y artefactos cargados exitosamente desde {target_path}")
+                    print(f"[OK] Tres modelos y explicadores SHAP cargados desde {target_path}")
                     return True
             except Exception as e:
                 print(f"[AVISO] Error cargando artefacto de {target_path}: {e}")
 
         # Sin artefacto real: queda en estado NO IMPLEMENTADO
         self.model = None
+        self.models = {}
+        self.explainers = {}
         self.artifact_loaded = False
         self.shap_service = ShapService(explainer=None, feature_names=self.feature_names)
         print(f"[INFO] Artefacto '{target_path}' NO encontrado. Endpoints de inferencia responderán 501.")
         return False
 
     def is_model_loaded(self) -> bool:
-        """Devuelve True estrictamente si hay un modelo real cargado."""
-        return self.artifact_loaded and self.model is not None
+        """True solo cuando están cargados los tres modelos independientes y sus SHAP."""
+        return self.artifact_loaded and all(
+            name in self.models and name in self.explainers and name in self.thresholds
+            for name in DEFAULT_THRESHOLDS
+        )
 
     def evaluate(self, lab_data: LabInput) -> EvaluationResponse:
         """
@@ -89,17 +121,20 @@ class ModelService:
         probs = self._predict_with_real_model(features)
 
         # Construir items de riesgo frente a sus umbrales
-        ath_val = round(probs["riesgo_aterosclerotico"], 3)
+        ath_probability = probs["riesgo_aterosclerotico"]
+        ath_val = round(ath_probability, 3)
         ath_umb = self.thresholds.get("riesgo_aterosclerotico", 0.10)
-        ath_alert = ath_val >= ath_umb
+        ath_alert = ath_probability >= ath_umb
 
-        hf_val = round(probs["riesgo_insuficiencia_cardiaca"], 3)
+        hf_probability = probs["riesgo_insuficiencia_cardiaca"]
+        hf_val = round(hf_probability, 3)
         hf_umb = self.thresholds.get("riesgo_insuficiencia_cardiaca", 0.08)
-        hf_alert = hf_val >= hf_umb
+        hf_alert = hf_probability >= hf_umb
 
-        ren_val = round(probs["riesgo_cardiorrenal"], 3)
+        ren_probability = probs["riesgo_cardiorrenal"]
+        ren_val = round(ren_probability, 3)
         ren_umb = self.thresholds.get("riesgo_cardiorrenal", 0.12)
-        ren_alert = ren_val >= ren_umb
+        ren_alert = ren_probability >= ren_umb
 
         tipos_riesgo = TiposRiesgo(
             riesgo_aterosclerotico=RiesgoItem(
@@ -139,8 +174,42 @@ class ModelService:
                 ),
             )
 
-        # Factores explicativos SHAP reales
-        factores_clave = self.shap_service.explain(features, probs, top_k=3)
+        # Explicar cada fenotipo con el TreeExplainer de su propio clasificador.
+        factor_candidates = []
+        for risk_name, is_alert in (
+            ("riesgo_aterosclerotico", ath_alert),
+            ("riesgo_insuficiencia_cardiaca", hf_alert),
+            ("riesgo_cardiorrenal", ren_alert),
+        ):
+            if not is_alert:
+                continue
+            explainer = self.explainers[risk_name]
+            service = ShapService(explainer=explainer, feature_names=self.feature_names)
+            factor_candidates.extend(
+                service.explain(
+                    features,
+                    {risk_name: probs[risk_name]},
+                    top_k=3,
+                    allow_heuristic_fallback=False,
+                )
+            )
+        unique_factors = {}
+        for factor in factor_candidates:
+            key = factor.variable
+            current = unique_factors.get(key)
+            impact = abs(float(factor.impacto.rstrip("%").replace("+", "")))
+            current_impact = (
+                abs(float(current.impacto.rstrip("%").replace("+", "")))
+                if current is not None
+                else -1
+            )
+            if impact > current_impact:
+                unique_factors[key] = factor
+        factores_clave = sorted(
+            unique_factors.values(),
+            key=lambda factor: abs(float(factor.impacto.rstrip("%").replace("+", ""))),
+            reverse=True,
+        )[:3]
         conclusion, recomendacion, prioridad = self._synthesize_verdict(
             ath_alert, hf_alert, ren_alert, features
         )
@@ -155,31 +224,16 @@ class ModelService:
         )
 
     def _predict_with_real_model(self, features: Dict[str, Any]) -> Dict[str, float]:
-        """Inferencia utilizando el modelo XGBoost real cargado."""
+        """Obtiene una probabilidad independiente de cada clasificador entrenado."""
         df_row = pd.DataFrame([features])[self.feature_names]
-        proba_base = float(self.model.predict_proba(df_row)[0][1])
-
-        # Derivar fenotipos a partir de proba_base y factores clave
-        ath_factor = (
-            (features["colesterol_total"] / 200.0) * 0.4
-            + (features["ap_hi"] / 130.0) * 0.3
-            + (1.2 if features["fuma"] == 1 else 0.8) * 0.3
-        )
-        hf_factor = (
-            (features["bmi"] / 25.0) * 0.4
-            + (features["ap_hi"] / 130.0) * 0.3
-            + (1.3 if features["diabetes"] == 1 else 0.8) * 0.3
-        )
-        ren_factor = (
-            (max(0, 90.0 - features["egfr"]) / 30.0) * 0.5
-            + (min(features["uacr"], 100.0) / 30.0) * 0.5
-        )
-
-        return {
-            "riesgo_aterosclerotico": max(0.01, min(0.99, proba_base * ath_factor)),
-            "riesgo_insuficiencia_cardiaca": max(0.01, min(0.99, proba_base * hf_factor)),
-            "riesgo_cardiorrenal": max(0.01, min(0.99, proba_base * ren_factor)),
-        }
+        probabilities = {}
+        for risk_name in DEFAULT_THRESHOLDS:
+            model = self.models[risk_name]
+            probability = float(model.predict_proba(df_row)[0][1])
+            if not np.isfinite(probability) or not 0.0 <= probability <= 1.0:
+                raise ValueError(f"El modelo '{risk_name}' devolvió una probabilidad inválida.")
+            probabilities[risk_name] = probability
+        return probabilities
 
     def _interpret_score(self, val: float, umbral: float) -> str:
         pct = int(round(val * 100))
