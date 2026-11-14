@@ -326,11 +326,13 @@ export const PatientTable = ({ patients = [], onSelectPatient, onOpenCommandMenu
                     {/* Acción */}
                     <td className="py-1.5 px-4 text-right">
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          console.log('[NextGen Health] Abriendo detalle de:', p.nombre);
                           onSelectPatient(p);
                         }}
-                        className={`px-3 py-1 rounded-[4px] text-[12px] font-medium border transition-colors inline-flex items-center gap-1 ${
+                        className={`px-3 py-1 rounded-[4px] text-[12px] font-medium border transition-colors inline-flex items-center gap-1 cursor-pointer ${
                           isSilent
                             ? 'bg-[#C2410C] hover:bg-[#9A3412] text-white border-transparent'
                             : 'bg-white hover:bg-[#F0F2F5] text-[#1D3B6B] border-[#CBD0D8]'

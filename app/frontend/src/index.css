@@ -51,7 +51,11 @@ body {
   outline-offset: 2px;
 }
 
-/* Transiciones sobrias y suaves */
+/* Transiciones sobrias y seguras */
+.drawer-enter {
+  transform: translateX(0);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .drawer-enter {
     animation: slideInRight 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;

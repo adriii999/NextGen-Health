@@ -35,20 +35,18 @@ export const PatientDrawer = ({ patient, onClose }) => {
   const uacrPrev = valores_clave?.uacr?.previo || 18;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
       {/* Backdrop sutil con clic para cerrar */}
       <div
-        className="absolute inset-0 bg-[#0E1621]/30 transition-opacity"
+        className="fixed inset-0 bg-[#0E1621]/40 transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10 pointer-events-none">
         <div
           ref={drawerRef}
-          className="w-screen max-w-[560px] bg-white border-l border-[#E3E6EB] shadow-lg flex flex-col drawer-enter"
-          role="dialog"
-          aria-modal="true"
+          className="pointer-events-auto w-screen max-w-[560px] bg-white border-l border-[#E3E6EB] shadow-2xl flex flex-col drawer-enter"
           aria-labelledby="drawer-title"
         >
           {/* Cabecera del Drawer */}
