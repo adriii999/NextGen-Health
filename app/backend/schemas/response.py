@@ -66,6 +66,9 @@ class EvaluarAnaliticaRequest(BaseModel):
     paciente_id: str = Field(..., description="Carpeta de paciente o archivo en data/analiticas")
     modo: str = Field("B", description="'B' para seguimiento longitudinal completo, 'A' para analítica aislada")
     analitica_archivo: Optional[str] = Field(None, description="Archivo específico dentro de la carpeta para Modo A")
+    analiticas_archivos: Optional[List[str]] = Field(
+        None, min_length=1, max_length=50, description="Visitas seleccionadas de este paciente"
+    )
 
 
 class AnaliticaEvaluadaItem(BaseModel):

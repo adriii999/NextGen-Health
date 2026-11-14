@@ -66,6 +66,25 @@ class FileService:
 
         return items
 
+    def load_selected_visits(self, paciente_id: str, filenames: List[str]):
+        base = self.base_dir.resolve()
+        folder = (base / paciente_id).resolve()
+        if folder.parent != base:
+            raise ValueError("El paciente debe pertenecer al directorio de analíticas")
+        if not folder.is_dir():
+            raise FileNotFoundError("No se encontró el paciente")
+        visits = []
+        for filename in filenames:
+            if "/" in filename or "\\" in filename or Path(filename).suffix.lower() != ".json":
+                raise ValueError("Selecciona archivos JSON de este paciente")
+            path = (folder / filename).resolve()
+            if path.parent != folder:
+                raise ValueError("La analítica no pertenece al paciente")
+            if not path.is_file():
+                raise FileNotFoundError(f"No se encontró la analítica {filename}")
+            visits.append({"archivo": filename, "datos": json.loads(path.read_text(encoding="utf-8"))})
+        return visits
+
     def _scan_patient_directory(self, folder: Path) -> Optional[AnaliticaItem]:
         """Escanea la carpeta de un paciente y ordena cronológicamente sus analíticas."""
         visit_files = sorted(

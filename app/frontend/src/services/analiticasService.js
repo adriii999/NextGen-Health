@@ -53,12 +53,33 @@ export function mapPatient(item, index = 0) {
 
 export function analysisError(error) {
   if (error?.response?.status === 501) return 'El modelo todavía no está disponible (HTTP 501). Entrena y exporta el artefacto antes de analizar.';
+  const detail = error?.response?.data?.detail;
+  if (Array.isArray(detail)) return detail.map((item) => {
+    const location = item.loc || [];
+    const index = location.indexOf('visitas');
+    const file = index >= 0 && Number.isInteger(location[index + 1]) ? `Archivo ${location[index + 1] + 1}, ` : '';
+    return `${file}${location.at(-1) === 'body' ? 'Carga' : location.at(-1)}: ${item.msg}`;
+  }).join('\n');
+  if (typeof detail === 'string') return detail;
   if (error?.response?.status === 422) return 'Los parámetros introducidos están fuera de los rangos fisiológicos permitidos.';
   if (!error?.response && error?.code) return 'No se ha podido conectar con el servicio backend. Comprueba la conexión y vuelve a intentarlo.';
-  return error?.response?.data?.detail || 'No se ha podido completar la operación. Vuelve a intentarlo.';
+  return detail?.mensaje || error?.message || 'No se ha podido completar la operación. Vuelve a intentarlo.';
 }
 
 export const analiticasService = {
+  async validarCarga(payload) {
+    const { data } = await apiClient.post('/analiticas/validar-carga', payload);
+    return data;
+  },
+  async evaluarCarga(payload) {
+    const { data } = await apiClient.post('/analiticas/evaluar-carga', payload, { timeout: 120000 });
+    return mapPatient(data);
+  },
+  async evaluarSeleccion(paciente_id, analiticas_archivos) {
+    const { data } = await apiClient.post('/analiticas/evaluar',
+      { paciente_id, analiticas_archivos }, { timeout: 120000 });
+    return mapPatient(data);
+  },
   async checkHealth() {
     try {
       const { data } = await apiClient.get('/health');

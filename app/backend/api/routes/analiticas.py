@@ -9,8 +9,35 @@ from app.backend.services.file_service import FileService
 from app.backend.services.model_service import ModelService, ModelNotImplementedError
 from app.backend.api.deps import get_file_service, get_model_service
 from app.backend.config import settings
+from app.backend.schemas.upload import PatientUpload
+from app.backend.schemas.clinical import LabInput
+from pydantic import ValidationError
 
 router = APIRouter(prefix="/analiticas", tags=["Analíticas de Carpeta"])
+
+
+@router.post("/validar-carga")
+def validate_uploaded_patient(request: PatientUpload):
+    """Valida las visitas enviadas desde el navegador sin almacenarlas en disco."""
+    try:
+        return request.clinical_data()
+    except ValidationError:
+        raise HTTPException(422, detail="La progresión calculada está fuera de los rangos admitidos. Revisa fechas y valores.")
+
+
+@router.post("/evaluar-carga", response_model=AnaliticaEvaluadaItem)
+def evaluate_uploaded_patient(
+    request: PatientUpload,
+    model_service: ModelService = Depends(get_model_service),
+):
+    raw = validate_uploaded_patient(request)
+    try:
+        evaluation = model_service.evaluate(LabInput(**raw))
+    except ModelNotImplementedError as exc:
+        raise HTTPException(501, detail=str(exc))
+    return AnaliticaEvaluadaItem(
+        archivo=raw["analitica_evaluada"], evaluacion=evaluation, datos_entrada=raw
+    )
 
 
 @router.get("", response_model=List[AnaliticaItem], status_code=status.HTTP_200_OK)
@@ -51,6 +78,16 @@ def evaluate_single_patient_or_lab(
                 "artefacto_esperado": str(settings.MODEL_PATH),
             },
         )
+
+    if request.analiticas_archivos is not None:
+        try:
+            visits = file_service.load_selected_visits(request.paciente_id, request.analiticas_archivos)
+            upload = PatientUpload(visitas=visits, modo="B" if len(visits) > 1 else "A")
+        except FileNotFoundError as exc:
+            raise HTTPException(404, detail=str(exc))
+        except (ValueError, ValidationError) as exc:
+            raise HTTPException(422, detail=str(exc))
+        return evaluate_uploaded_patient(upload, model_service)
 
     parsed = file_service.load_single_item(
         paciente_id=request.paciente_id,

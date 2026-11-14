@@ -145,6 +145,49 @@ select { width: 100%; min-height: 44px; border: 1px solid #bfcfc8; border-radius
 .visit-filename { display: block; font-size: 11px; color: #526765; }
 .skip-link { position: absolute; left: 16px; top: -80px; background: white; padding: 12px; z-index: 10; }
 .skip-link:focus { top: 12px; }
+.upload-panel { padding: 24px; min-width: 0; }
+.upload-panel > label { display: block; font-weight: 600; margin: 22px 0 10px; }
+.upload-panel input[type="file"] { display: block; width: 100%; min-height: 44px; border: 1px solid #bfcfc8; padding: 10px; border-radius: 6px; }
+.upload-panel input::file-selector-button { cursor: pointer; padding: 8px 12px; margin-right: 12px; background: #edf5f1; border: 1px solid #bbcfc8; border-radius: 4px; }
+.upload-help, .upload-format p { color: #526765; font-size: 13px; margin-top: 12px; }
+.upload-format { margin-top: 18px; }
+.upload-format summary { cursor: pointer; min-height: 44px; padding: 10px 0; font-weight: 600; }
+.upload-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px; }
+.upload-fields dd { margin: 4px 0 0; }
+.upload-status { padding: 18px 0; color: #526765; }
+.upload-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin-top: 22px; }
+.upload-controls > div { flex: 1 1 220px; min-width: 0; }
+.upload-controls label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; }
+.upload-results { margin-top: 24px; }
+.upload-error p { white-space: pre-line; overflow-wrap: anywhere; }
+.consultation-layout { display: grid; grid-template-columns: minmax(250px, 320px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.consultation-main { min-width: 0; }
+.consultation-demo { padding: 12px 16px; margin-bottom: 24px; background: #edf5f1; color: #244f47; border: 1px solid #bbcfc8; border-radius: 6px; font-size: 13px; }
+.consultation-visits { border: 0; padding: 0; margin: 24px 0; min-width: 0; }
+.consultation-visits legend { font-weight: 600; margin-bottom: 12px; }
+.consultation-visit { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border: 1px solid #d8e2dd; border-radius: 6px; margin-bottom: 10px; cursor: pointer; }
+.consultation-visit:hover { background: #f5f8f6; }
+.consultation-visit.checked { border-color: #17695e; background: #edf5f1; }
+.consultation-visit input { width: 20px; height: 20px; flex-shrink: 0; margin-top: 3px; accent-color: #17695e; cursor: pointer; }
+.consultation-visit > span { min-width: 0; overflow-wrap: anywhere; }
+.consultation-visit small, .visit-values { display: block; color: #526765; font-size: 12px; margin-top: 6px; }
+.consultation-action { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.consultation-action p { font-size: 13px; color: #526765; }
+.consultation-back { padding: 20px 4% 0; }
+.evolution-selector { margin-top: 22px; max-width: 440px; }
+.evolution-selector label, .lab-detail label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.evolution-chart { height: 280px; width: 100%; min-width: 0; margin-top: 14px; }
+.lab-detail { margin-top: 20px; border-top: 1px solid #d8e2dd; padding-top: 10px; }
+.lab-detail summary { cursor: pointer; padding: 12px 0; min-height: 44px; font-weight: 600; }
+.lab-detail h3 { margin-top: 20px; }
+.lab-detail dd { margin: 0; font-size: 18px; font-weight: 600; }
+.current-risk-heading { margin: 26px 0 16px; }
+.current-risk-heading p { font-size: 13px; color: #526765; margin-top: 8px; }
+@media (max-width: 760px) {
+  .consultation-layout { grid-template-columns: minmax(0, 1fr); }
+  .consultation-layout .patient-list { max-height: 260px; overflow-y: auto; }
+  .consultation-action { align-items: stretch; flex-direction: column; }
+}
 @media (max-width: 760px) {
   .header-context { display: none; }
   .workspace { padding: 24px 16px; }

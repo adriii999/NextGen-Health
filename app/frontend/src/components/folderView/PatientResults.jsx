@@ -6,7 +6,7 @@ const format = (value) =>
     ? 'No disponible'
     : value.toLocaleString('es-ES', { maximumFractionDigits: 2 });
 
-export function PatientResults({ patient, onEvaluateMode, busy }) {
+export function PatientResults({ patient, onEvaluateMode, busy, showHistory = true }) {
   const visitas = Array.isArray(patient.historial_visitas) ? patient.historial_visitas : [];
   const isModoB = patient.modo_evaluacion === 'MODO_B';
   const kdigo = patient.perfil_renal;
@@ -29,7 +29,7 @@ export function PatientResults({ patient, onEvaluateMode, busy }) {
         </div>
         <h2>{patient.nombre}</h2>
         <p className="source-label">
-          Carpeta: <strong>{patient.paciente_id || patient.archivo}</strong>
+          Paciente: <strong>{patient.paciente_id || patient.archivo}</strong>
           {patient.analitica_evaluada && patient.analitica_evaluada !== patient.archivo
             ? ` · Analítica activa: ${patient.analitica_evaluada}`
             : ''}
@@ -137,11 +137,11 @@ export function PatientResults({ patient, onEvaluateMode, busy }) {
         <small>Revisa el contexto del paciente antes de decidir la actuación clínica.</small>
       </section>
 
-      {visitas.length > 1 && (
+      {showHistory && visitas.length > 1 && (
         <section className="result-section">
           <div className="section-heading">
             <div>
-              <h3>Historial cronológico en la carpeta del paciente</h3>
+              <h3>Historial cronológico del paciente</h3>
               <p>
                 Secuencia de analíticas registradas para este paciente ({visitas.length} visitas).
               </p>
