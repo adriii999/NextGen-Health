@@ -1,6 +1,6 @@
 // src/components/folderView/PatientTable.jsx
 import React, { useState } from 'react';
-import { Search, Eye, ChevronDown, ChevronRight, ArrowRight, Printer, AlertOctagon, Heart, Pill, Calendar, AlertTriangle } from 'lucide-react';
+import { Search, Eye, ArrowRight, Printer, Pill, Calendar, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Sparkline } from '../charts/Sparkline';
 import { PatientCarePlanModal } from '../patientCare/PatientCarePlanModal';
 
@@ -17,8 +17,8 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
         return {
           id: 'MIRAR_HOY',
           label: 'Mirar hoy',
-          dotColor: 'bg-[#C2410C] animate-pulse',
-          badgeClass: 'bg-[#FDEFE6] text-[#C2410C] border-[#F4D0BD]',
+          dotColor: 'bg-rose-600 animate-pulse',
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
           priority: 1,
           isSilent: true,
         };
@@ -26,8 +26,8 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
         return {
           id: 'MIRAR_HOY',
           label: 'Mirar hoy',
-          dotColor: 'bg-[#B3261E] animate-pulse',
-          badgeClass: 'bg-[#FBEAE9] text-[#B3261E] border-[#F5C2C0]',
+          dotColor: 'bg-rose-600 animate-pulse',
+          badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
           priority: 2,
           isSilent: false,
         };
@@ -35,8 +35,8 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
         return {
           id: 'VIGILAR',
           label: 'Vigilar',
-          dotColor: 'bg-[#A16207]',
-          badgeClass: 'bg-[#FBF3DD] text-[#714405] border-[#F2DFAC]',
+          dotColor: 'bg-amber-600',
+          badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
           priority: 3,
           isSilent: false,
         };
@@ -45,8 +45,8 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
         return {
           id: 'ESTABLE',
           label: 'Estable',
-          dotColor: 'bg-[#1F7A55]',
-          badgeClass: 'bg-[#E6F4EC] text-[#16563C] border-[#BDDFC9]',
+          dotColor: 'bg-emerald-600',
+          badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
           priority: 4,
           isSilent: false,
         };
@@ -103,17 +103,17 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
 
   return (
     <>
-      <div className="bg-white rounded-[6px] border border-[#E3E6EB] overflow-hidden">
-        {/* Barra de Filtros Clínicos y Buscador Único Sencillo */}
-        <div className="px-4 py-3 border-b border-[#E3E6EB] bg-[#F6F7F9] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+        {/* Barra de Filtros Clínicos y Buscador Único */}
+        <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           
           {/* Pestañas de Decisión Clínica */}
           <div className="flex items-center gap-1.5 overflow-x-auto" role="tablist">
             {[
               { id: 'TODOS', label: 'Todos', count: counts.total },
-              { id: 'MIRAR_HOY', label: '🔴 Mirar hoy', count: counts.mirarHoy, isAlert: true },
-              { id: 'VIGILAR', label: '🟡 Vigilar', count: counts.vigilar },
-              { id: 'ESTABLE', label: '🟢 Estable', count: counts.estable },
+              { id: 'MIRAR_HOY', label: 'Mirar hoy', count: counts.mirarHoy, isAlert: true },
+              { id: 'VIGILAR', label: 'Vigilar', count: counts.vigilar },
+              { id: 'ESTABLE', label: 'Estable', count: counts.estable },
             ].map((tab) => {
               const isSelected = selectedFilter === tab.id;
               return (
@@ -122,18 +122,19 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
                   role="tab"
                   aria-selected={isSelected}
                   onClick={() => setSelectedFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-[4px] text-[12px] font-semibold transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                     isSelected
                       ? tab.isAlert
-                        ? 'bg-[#C2410C] text-white shadow-xs'
-                        : 'bg-[#1D3B6B] text-white shadow-xs'
-                      : 'bg-white text-[#5A6573] border border-[#E3E6EB] hover:text-[#0E1621] hover:bg-[#F0F2F5]'
+                        ? 'bg-rose-700 text-white shadow-xs'
+                        : 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
+                  {tab.isAlert && <span className="w-1.5 h-1.5 rounded-full bg-rose-300" />}
                   <span>{tab.label}</span>
                   <span
-                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-[4px] ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-[#F0F2F5] text-[#5A6573]'
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
                     }`}
                   >
                     {tab.count}
@@ -143,15 +144,15 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
             })}
           </div>
 
-          {/* Único Buscador Clínico Sencillo (Sin atajos de teclado complejos) */}
+          {/* Único Buscador Clínico Sencillo */}
           <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 text-[#8A94A3] absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar paciente por nombre o ID..."
-              className="w-full text-[12px] pl-8 pr-3 py-1.5 rounded-[4px] border border-[#CBD0D8] bg-white text-[#0E1621] placeholder-[#8A94A3] focus:border-[#1D3B6B] focus:outline-none"
+              className="w-full text-xs pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:border-slate-800 focus:outline-none"
             />
           </div>
         </div>
@@ -160,18 +161,18 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
         <div className="w-full">
           <table className="w-full table-fixed text-left border-collapse">
             <thead>
-              <tr className="border-b border-[#E3E6EB] bg-[#F6F7F9] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#5A6573]">
-                <th className="py-2.5 px-4 w-[24%]">Paciente</th>
-                <th className="py-2.5 px-3 w-[16%]">Decisión</th>
-                <th className="py-2.5 px-3 w-[26%]">Tendencia eGFR (12m)</th>
-                <th className="py-2.5 px-3 w-[22%]">Motivo de Decisión</th>
-                <th className="py-2.5 px-4 w-[12%] text-right">Acción</th>
+              <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500 bg-slate-50/75 border-b border-slate-200">
+                <th className="py-3 px-4 w-[24%]">Paciente</th>
+                <th className="py-3 px-3 w-[16%]">Decisión</th>
+                <th className="py-3 px-3 w-[26%]">Tendencia eGFR (12m)</th>
+                <th className="py-3 px-3 w-[22%]">Motivo de Decisión</th>
+                <th className="py-3 px-4 w-[12%] text-right">Acción</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E3E6EB] text-[13px]">
+            <tbody className="divide-y divide-slate-100 text-xs">
               {filteredPatients.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="py-10 text-center text-[12px] text-[#5A6573]">
+                  <td colSpan="5" className="py-10 text-center text-xs text-slate-500">
                     No hay pacientes con el criterio de decisión seleccionado.
                   </td>
                 </tr>
@@ -185,12 +186,10 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
                   const egfrPrev = p.valores_clave?.egfr?.previo;
                   const deltaEgfr = p.valores_clave?.egfr?.delta;
 
-                  // Puntos reales de la analítica del paciente para el sparkline
+                  // Puntos reales de la analítica del paciente
                   const sparkPoints = egfrPrev !== null && egfrPrev !== undefined
                     ? [egfrPrev, egfrAct]
                     : [egfrAct, egfrAct];
-
-                  const pctDrop = egfrPrev ? Math.round((Math.abs(deltaEgfr) / egfrPrev) * 100) : 0;
 
                   return (
                     <React.Fragment key={p.id}>
@@ -200,34 +199,34 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
                         }}
                         className={`cursor-pointer transition-colors ${
                           isExpanded
-                            ? 'bg-[#F0F4FA]'
+                            ? 'bg-slate-100/70'
                             : isSilent
-                            ? 'bg-[#FDEFE6]/25 hover:bg-[#FDEFE6]/40'
-                            : 'hover:bg-[#F6F7F9]'
+                            ? 'bg-rose-50/20 hover:bg-rose-50/40'
+                            : 'hover:bg-slate-50'
                         }`}
                       >
                         {/* 1. Paciente */}
-                        <td className="py-2.5 px-4">
-                          <div className="font-semibold text-[#0E1621] leading-tight">
+                        <td className="py-3 px-4">
+                          <div className="font-semibold text-slate-900 leading-tight">
                             {p.nombre}
                           </div>
-                          <div className="text-[11px] font-mono text-[#5A6573] mt-0.5">
+                          <div className="text-[11px] font-mono text-slate-500 mt-0.5">
                             {p.id} • {p.edad}a • {p.sexo}
                           </div>
                         </td>
 
                         {/* 2. Estado / Decisión */}
-                        <td className="py-2.5 px-3">
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] border text-[11px] font-bold ${status.badgeClass}`}>
-                            <span className={`w-2 h-2 rounded-full ${status.dotColor}`} />
+                        <td className="py-3 px-3">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${status.badgeClass}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${status.dotColor}`} />
                             <span>{status.label}</span>
                           </span>
                         </td>
 
-                        {/* 3. Tendencia eGFR con Puntos Reales e Inicial -> Actual */}
-                        <td className="py-2.5 px-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-16 shrink-0">
+                        {/* 3. Tendencia eGFR con Puntos Reales e Inicial -> Actual Monospaciado */}
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-18 shrink-0">
                               <Sparkline
                                 points={sparkPoints}
                                 isSilent={isSilent}
@@ -236,41 +235,37 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
                                 ariaLabel={`Evolución eGFR: ${sparkPoints.join(' a ')}`}
                               />
                             </div>
-                            <div className="font-mono text-[11px] tabular-nums">
+                            <div className="font-mono text-xs tabular-nums text-slate-700">
                               {egfrPrev !== null && egfrPrev !== undefined ? (
-                                <span className="text-[#0E1621]">
-                                  <strong>{egfrPrev}</strong> → <strong className={deltaEgfr < -5 ? 'text-[#C2410C]' : 'text-[#1F7A55]'}>{egfrAct}</strong>
-                                  <span className={`ml-1 font-semibold ${deltaEgfr < -5 ? 'text-[#C2410C]' : 'text-[#1F7A55]'}`}>
-                                    ({deltaEgfr > 0 ? `+${deltaEgfr}` : `${deltaEgfr}`} mL)
+                                <span>
+                                  <span className="font-medium">{egfrPrev}</span> → <span className="font-semibold text-slate-900">{egfrAct}</span>
+                                  <span className={`ml-1.5 font-medium ${deltaEgfr < -5 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                    ({deltaEgfr > 0 ? `+${deltaEgfr}` : deltaEgfr} mL)
                                   </span>
                                 </span>
                               ) : (
-                                <span className="font-semibold text-[#0E1621]">{egfrAct} mL/min</span>
+                                <span className="font-semibold text-slate-900">{egfrAct} mL/min</span>
                               )}
                             </div>
                           </div>
                         </td>
 
-                        {/* 4. Motivo Corto en Español Llano */}
-                        <td className="py-2.5 px-3 text-[12px] text-[#5A6573] leading-snug">
+                        {/* 4. Motivo de Decisión con buen interlineado */}
+                        <td className="py-3 px-3 text-xs leading-relaxed text-slate-600 line-clamp-2">
                           {getShortReason(p)}
                         </td>
 
-                        {/* 5. Acción Directa */}
-                        <td className="py-2.5 px-4 text-right">
+                        {/* 5. Acción Directa: Botón Ghost Elegante */}
+                        <td className="py-3 px-4 text-right">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               onSelectPatient(p);
                             }}
-                            className={`px-3 py-1 rounded-[4px] text-[11px] font-semibold border transition-colors inline-flex items-center gap-1 cursor-pointer shadow-xs ${
-                              isSilent
-                                ? 'bg-[#C2410C] hover:bg-[#9A3412] text-white border-transparent'
-                                : 'bg-white hover:bg-[#F0F2F5] text-[#1D3B6B] border-[#CBD0D8]'
-                            }`}
+                            className="bg-transparent hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs hover:text-slate-900"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
                             <span>Ver decisión</span>
                           </button>
                         </td>
@@ -278,67 +273,67 @@ export const PatientTable = ({ patients = [], onSelectPatient }) => {
 
                       {/* Despliegue Rápido Inline: Pauta Inmediata para el Médico */}
                       {isExpanded && (
-                        <tr className="bg-[#FAFBFD] border-b border-[#E3E6EB]">
+                        <tr className="bg-slate-50/90 border-b border-slate-200">
                           <td colSpan="5" className="p-0">
-                            <div className={`p-4 border-l-[4px] ${isSilent ? 'border-l-[#C2410C]' : 'border-l-[#1D3B6B]'} space-y-3`}>
+                            <div className={`p-4 border-l-4 ${isSilent ? 'border-l-rose-600' : 'border-l-slate-800'} space-y-3`}>
                               
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#E3E6EB]">
-                                <div className="text-[12px] font-bold text-[#0E1621]">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                                <div className="text-xs font-bold text-slate-900">
                                   {p.conclusion_diagnostica}
                                 </div>
-                                <span className="text-[11px] font-mono text-[#5A6573]">
+                                <span className="text-[11px] font-mono text-slate-500">
                                   Creatinina: {p.valores_clave?.creatinina?.actual} mg/dL • UACR: {p.valores_clave?.uacr?.actual} mg/g
                                 </span>
                               </div>
 
                               {/* 3 Cuidados Clínicos para Decidir en Consulta */}
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
-                                <div className="p-2.5 rounded-[4px] bg-white border border-[#E3E6EB] space-y-1">
-                                  <div className="flex items-center gap-1.5 font-bold text-[#1D3B6B]">
-                                    <Pill className="w-3.5 h-3.5" />
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                                <div className="p-3 rounded-lg bg-white border border-slate-200 space-y-1">
+                                  <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                                    <Pill className="w-3.5 h-3.5 text-blue-600" />
                                     <span>Pauta Farmacológica</span>
                                   </div>
-                                  <p className="text-[#0E1621] font-medium">
+                                  <p className="text-slate-600 text-[11px]">
                                     Iniciar iSGLT2 (Dapagliflozina / Empagliflozina 10mg/d)
                                   </p>
                                 </div>
 
-                                <div className="p-2.5 rounded-[4px] bg-[#FDEFE6]/70 border border-[#F4D0BD] space-y-1">
-                                  <div className="flex items-center gap-1.5 font-bold text-[#842A06]">
-                                    <AlertTriangle className="w-3.5 h-3.5 text-[#C2410C]" />
+                                <div className="p-3 rounded-lg bg-amber-50/70 border border-amber-200 space-y-1">
+                                  <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
                                     <span>Precaución (Nefrotóxicos)</span>
                                   </div>
-                                  <p className="text-[#842A06] font-medium">
+                                  <p className="text-amber-900 text-[11px]">
                                     Prohibir o evitar AINEs (Ibuprofeno/Naproxeno)
                                   </p>
                                 </div>
 
-                                <div className="p-2.5 rounded-[4px] bg-[#E6F4EC]/60 border border-[#BDDFC9] space-y-1">
-                                  <div className="flex items-center gap-1.5 font-bold text-[#16563C]">
-                                    <Calendar className="w-3.5 h-3.5 text-[#1F7A55]" />
+                                <div className="p-3 rounded-lg bg-emerald-50/70 border border-emerald-200 space-y-1">
+                                  <div className="flex items-center gap-1.5 font-bold text-emerald-950">
+                                    <Calendar className="w-3.5 h-3.5 text-emerald-600" />
                                     <span>Seguimiento en AP</span>
                                   </div>
-                                  <p className="text-[#16563C] font-medium">
+                                  <p className="text-emerald-900 text-[11px]">
                                     Control de UACR y tensión en 60 días con enfermería
                                   </p>
                                 </div>
                               </div>
 
                               {/* Botones de Acción */}
-                              <div className="flex items-center justify-end gap-2 pt-1">
+                              <div className="flex items-center justify-end gap-2.5 pt-1">
                                 <button
                                   type="button"
                                   onClick={() => setCarePlanPatient(p)}
-                                  className="px-3 py-1.5 rounded-[4px] border border-[#CBD0D8] hover:bg-[#F0F2F5] text-[#0E1621] text-[11px] font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                                  className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                                 >
-                                  <Printer className="w-3.5 h-3.5 text-[#5A6573]" />
+                                  <Printer className="w-3.5 h-3.5 text-slate-500" />
                                   <span>Hoja para el paciente</span>
                                 </button>
 
                                 <button
                                   type="button"
                                   onClick={() => onSelectPatient(p)}
-                                  className="px-3.5 py-1.5 rounded-[4px] bg-[#1D3B6B] hover:bg-[#162E54] text-white text-[11px] font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer shadow-xs"
+                                  className="bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1 cursor-pointer shadow-sm"
                                 >
                                   <span>Ver Segunda Opinión Completa</span>
                                   <ArrowRight className="w-3.5 h-3.5" />

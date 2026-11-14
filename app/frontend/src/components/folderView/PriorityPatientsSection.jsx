@@ -1,6 +1,6 @@
 // src/components/folderView/PriorityPatientsSection.jsx
 import React from 'react';
-import { AlertOctagon, ArrowRight, Pill, Calendar, Heart, Printer, ExternalLink, Activity } from 'lucide-react';
+import { AlertOctagon, ArrowRight, Pill, Calendar, Heart, Printer, ShieldAlert, AlertTriangle, FileText, CheckCircle2 } from 'lucide-react';
 
 export const PriorityPatientsSection = ({ patients = [], onSelectPatient, onOpenCarePlan }) => {
   // Filtrar exclusivamente los pacientes con riesgo oculto silencioso
@@ -9,32 +9,35 @@ export const PriorityPatientsSection = ({ patients = [], onSelectPatient, onOpen
   if (priorityPatients.length === 0) return null;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Cabecera de la Sección: Responder en 5 segundos a "¿a quién miro primero y por qué?" */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#FDEFE6] p-3.5 rounded-[6px] border border-[#F4D0BD]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-[4px] bg-[#C2410C] text-white flex items-center justify-center shrink-0">
-            <AlertOctagon className="w-4 h-4" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-rose-50 border border-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+            <AlertOctagon className="w-4 h-4 text-rose-600" />
           </div>
           <div>
-            <h3 className="text-[13px] font-bold text-[#842A06] uppercase tracking-[0.03em] flex items-center gap-2">
-              <span>A quién mirar hoy en el cupo</span>
-              <span className="text-[11px] font-mono px-2 py-0.2 rounded bg-white text-[#C2410C] border border-[#F4D0BD]">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                A quién mirar hoy en el cupo
+              </h3>
+              <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
                 {priorityPatients.length} casos prioritarios
               </span>
-            </h3>
-            <p className="text-[12px] text-[#842A06]/90 mt-0.5">
-              Pacientes con <strong>analítica aparentemente normal en el laboratorio rutinario</strong>, pero con <strong>deterioro silente acelerado</strong> en su trayectoria de 12 meses.
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Pacientes con <strong>creatinina falsamente normal</strong> pero con <strong>pérdida silente acelerada</strong> de función cardiorrenal.
             </p>
           </div>
         </div>
 
-        <span className="text-[11px] font-medium text-[#842A06] self-start sm:self-auto bg-white/70 px-2.5 py-1 rounded border border-[#F4D0BD]">
-          Prioridad 1 en AP
-        </span>
+        <div className="flex items-center gap-1.5 self-start sm:self-auto text-xs font-medium text-slate-600 bg-slate-50 px-3 py-1 rounded-md border border-slate-200">
+          <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
+          <span>Prioridad 1 en Atención Primaria</span>
+        </div>
       </div>
 
-      {/* Cuadrícula de Tarjetas de Decisión Prioritaria */}
+      {/* Cuadrícula de Tarjetas Hero de Alta Gama */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {priorityPatients.map((patient) => {
           const egfrAct = patient.valores_clave?.egfr?.actual || 68;
@@ -49,159 +52,235 @@ export const PriorityPatientsSection = ({ patients = [], onSelectPatient, onOpen
           const uacrPrev = patient.valores_clave?.uacr?.previo || 18;
           const deltaUacr = patient.valores_clave?.uacr?.delta || 17;
 
-          // Titular asertivo en lenguaje llano según el paciente
-          const plainTitle = patient.id === 'PAC-02-SILENTE'
-            ? `Creatinina normal (${creatAct} mg/dL), pero ha perdido 1/5 del filtrado en 1 año (-${pctEgfr}%)`
-            : `Creatinina en rango (${creatAct} mg/dL), pero la microalbuminuria se ha disparado (+${deltaUacr} mg/g)`;
+          // Titulares clínicos de impacto
+          const isManuel = patient.id === 'PAC-02-SILENTE';
+          const headline = isManuel
+            ? `Creatinina en rango normal (${creatAct} mg/dL), pero pérdida del ${pctEgfr}% de filtrado en 12 meses`
+            : `Creatinina en rango normal (${creatAct} mg/dL), pero microalbuminuria disparada (+${deltaUacr} mg/g)`;
 
           return (
             <div
               key={patient.id}
-              className="bg-white rounded-[6px] border-2 border-[#F4D0BD] shadow-xs flex flex-col justify-between overflow-hidden"
+              className="bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between overflow-hidden"
             >
-              {/* Parte Superior: Datos del Paciente y Etiqueta Mirar Hoy */}
-              <div className="p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-[#E3E6EB] pb-2.5">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[15px] font-bold text-[#0E1621]">
-                        {patient.nombre}
-                      </span>
-                      <span className="text-[11px] font-mono text-[#5A6573] bg-[#F0F2F5] px-1.5 py-0.5 rounded border border-[#E3E6EB]">
-                        {patient.id}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[#5A6573] mt-0.5">
-                      {patient.edad} años • {patient.sexo} • Modo B (Historial 12 meses)
-                    </p>
+              <div className="p-5 space-y-4">
+                
+                {/* 1. Cabecera de la Tarjeta */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-900 text-base">
+                      {patient.nombre}
+                    </span>
+                    <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">
+                      {patient.id}
+                    </span>
                   </div>
 
-                  {/* Etiqueta Directa: Mirar Hoy */}
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-[#FDEFE6] text-[#C2410C] border border-[#F4D0BD] text-[11px] font-bold">
-                    <span className="w-2 h-2 rounded-full bg-[#C2410C] animate-pulse" />
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
                     <span>Mirar hoy</span>
                   </span>
                 </div>
 
-                {/* Titular en Lenguaje Llano */}
-                <div className="bg-[#FAFBFD] p-2.5 rounded-[5px] border border-[#E3E6EB]">
-                  <h4 className="text-[12px] font-bold text-[#0E1621] leading-snug">
-                    {plainTitle}
+                <div className="text-xs text-slate-500 -mt-2">
+                  {patient.edad} años • {patient.sexo} • Trayectoria interanual (Modo B)
+                </div>
+
+                {/* 2. Bloque de Alerta Clínica Integrado (Callout de trampa analítica) */}
+                <div className="bg-amber-50/60 border-l-4 border-amber-500 rounded-r-lg p-3.5 space-y-1">
+                  <h4 className="text-xs font-bold text-amber-950 leading-snug">
+                    {headline}
                   </h4>
-                  <p className="text-[11px] text-[#5A6573] mt-1 leading-relaxed">
-                    <strong>La trampa analítica:</strong> La creatinina ({creatAct} mg/dL) no supera el corte estándar de laboratorio, pero el filtrado glomerular cae aceleradamente a <strong>{egfrAct} mL/min</strong> y la microalbuminuria alcanza <strong>{uacrAct} mg/g</strong>.
+                  <p className="text-xs text-slate-700 leading-relaxed pt-0.5">
+                    La analítica rutinaria clasifica la creatinina (<span className="font-mono font-semibold text-slate-900 bg-amber-100/70 px-1 py-0.2 rounded">{creatAct} mg/dL</span>) como "normal", pero el filtrado glomerular real cae aceleradamente a <span className="font-mono font-semibold text-rose-700 bg-rose-100/70 px-1 py-0.2 rounded">{egfrAct} mL/min</span> con microalbuminuria de <span className="font-mono font-semibold text-rose-700 bg-rose-100/70 px-1 py-0.2 rounded">{uacrAct} mg/g</span>.
                   </p>
                 </div>
 
-                {/* Gráfico Visual de 12 Meses: Creatinina Plana vs Filtrado en Descenso */}
-                <div className="space-y-1 pt-1">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-semibold text-[#0E1621]">
-                      Contraste de Trayectoria (12 Meses)
+                {/* 3. Gráfico de Trayectoria Rediseñado (Sin colisiones, 2 planos visuales) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-800">
+                      Contraste de Trayectoria a 12 Meses
                     </span>
-                    <span className="text-[10px] text-[#5A6573]">
+                    <span className="text-[11px] text-emerald-700 font-medium">
                       Banda verde = Rango seguro (&gt;60 mL/min)
                     </span>
                   </div>
 
-                  <div className="bg-[#F8FAFC] p-2.5 rounded-[5px] border border-[#E3E6EB]">
-                    <svg viewBox="0 0 380 95" className="w-full h-24 overflow-visible">
-                      {/* Banda sombreada de normalidad clínica (>60 mL/min) */}
-                      <rect x="35" y="8" width="335" height="42" fill="#E6F4EC" fillOpacity="0.5" rx="3" />
-                      <text x="42" y="19" fill="#1F7A55" fontSize="8" fontWeight="700">
-                        ZONA DE NORMALIDAD (&gt;60 mL/min)
-                      </text>
+                  <div className="bg-slate-50/70 rounded-lg border border-slate-200/80 p-3 overflow-hidden">
+                    <svg viewBox="0 0 480 160" className="w-full h-38 overflow-visible">
+                      <defs>
+                        <linearGradient id={`safeZone-${patient.id}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10B981" stopOpacity="0.12" />
+                          <stop offset="100%" stopColor="#10B981" stopOpacity="0.04" />
+                        </linearGradient>
+                      </defs>
 
-                      {/* Eje de tiempo */}
-                      <line x1="35" y1="78" x2="370" y2="78" stroke="#E3E6EB" strokeWidth="1" />
-                      <text x="75" y="90" textAnchor="middle" fontSize="8.5" fontWeight="600" fill="#5A6573">Hace 12 meses</text>
-                      <text x="310" y="90" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#0E1621">Hoy (Consulta)</text>
+                      {/* --- PLANO SUPERIOR: FILTRADO GLOMERULAR (eGFR) --- */}
 
-                      {/* 1. LÍNEA DE CREATININA (Plana, engañosa en azul/gris) */}
-                      {/* Y escala normalizada: 0.8 -> y=38, 1.1 -> y=34 (casi horizontal en rango seguro) */}
-                      <line
-                        x1="75"
-                        y1="38"
-                        x2="310"
-                        y2="34"
-                        stroke="#5A6573"
-                        strokeWidth="2"
-                        strokeDasharray="3 3"
+                      {/* 1. Área Sombreada de Normalidad (>60 mL/min) de Y=8 a Y=58 */}
+                      <rect
+                        x="30"
+                        y="8"
+                        width="430"
+                        height="50"
+                        fill={`url(#safeZone-${patient.id})`}
+                        rx="4"
                       />
-                      <circle cx="75" cy="38" r="3" fill="#5A6573" />
-                      <circle cx="310" cy="34" r="3" fill="#5A6573" />
-                      <text x="75" y="48" textAnchor="middle" fontSize="8" className="font-mono" fill="#5A6573">
-                        Cr {creatPrev}
-                      </text>
-                      <text x="310" y="46" textAnchor="middle" fontSize="8" fontWeight="700" className="font-mono" fill="#5A6573">
-                        Cr {creatAct} ("Normal")
+                      {/* Línea discontinua de umbral muy fina en 60 mL/min */}
+                      <line
+                        x1="30"
+                        y1="58"
+                        x2="460"
+                        y2="58"
+                        stroke="#10B981"
+                        strokeWidth="1"
+                        strokeDasharray="3 3"
+                        strokeOpacity="0.5"
+                      />
+                      {/* Watermark discreto en esquina superior derecha (nunca colisiona con datos) */}
+                      <text
+                        x="450"
+                        y="22"
+                        textAnchor="end"
+                        fontSize="9"
+                        fontWeight="600"
+                        fill="#059669"
+                        opacity="0.85"
+                      >
+                        Zona de normalidad (&gt;60 mL/min)
                       </text>
 
-                      {/* 2. LÍNEA DE FILTRADO GLOMERULAR (En picado hacia abajo, naranja/roja) */}
-                      {/* Y escala: 86 -> y=22 (arriba), 68 -> y=62 (cayendo hacia abajo) */}
+                      {/* Línea continua de alerta clínica de eGFR (de Y=26 a Y=78) */}
                       <line
-                        x1="75"
-                        y1="22"
-                        x2="310"
-                        y2="62"
+                        x1="80"
+                        y1="26"
+                        x2="360"
+                        y2="78"
                         stroke="#C2410C"
-                        strokeWidth="2.8"
+                        strokeWidth="2.75"
                         strokeLinecap="round"
                       />
-                      <circle cx="75" cy="22" r="4" fill="#1F7A55" stroke="#FFFFFF" strokeWidth="1.5" />
-                      <circle cx="310" cy="62" r="4.5" fill="#C2410C" stroke="#FFFFFF" strokeWidth="1.5" />
-                      <text x="75" y="16" textAnchor="middle" fontSize="9" fontWeight="700" className="font-mono" fill="#1F7A55">
-                        eGFR {egfrPrev}
+
+                      {/* Punto T-1 (Hace 12 meses): eGFR Inicial */}
+                      <circle cx="80" cy="26" r="4.5" fill="#10B981" stroke="#FFFFFF" strokeWidth="2" />
+                      {/* Badge flotante T-1 */}
+                      <g transform="translate(48, 8)">
+                        <rect width="64" height="15" rx="3" fill="#FFFFFF" stroke="#CBD0D8" strokeWidth="0.75" />
+                        <text x="32" y="11" textAnchor="middle" fontSize="9" fontWeight="700" className="font-mono" fill="#10B981">
+                          {egfrPrev} mL/min
+                        </text>
+                      </g>
+
+                      {/* Punto T (Hoy): eGFR Actual con caída */}
+                      <circle cx="360" cy="78" r="5.5" fill="#C2410C" stroke="#FFFFFF" strokeWidth="2" />
+                      {/* Badge flotante tipo "pill" en el punto final (evita cualquier colisión) */}
+                      <g transform="translate(320, 92)">
+                        <rect width="135" height="18" rx="4" fill="#FFFFFF" stroke="#F4D0BD" strokeWidth="1" />
+                        <text x="67" y="13" textAnchor="middle" fontSize="9" fontWeight="800" className="font-mono" fill="#C2410C">
+                          Hoy: {egfrAct} mL/min (-{pctEgfr}%)
+                        </text>
+                      </g>
+
+
+                      {/* --- PLANO INFERIOR: CREATININA SÉRICA (Plana, en rango normal) --- */}
+                      
+                      {/* Línea horizontal discontinua de Creatinina (de Y=126 a Y=124) */}
+                      <line
+                        x1="80"
+                        y1="126"
+                        x2="360"
+                        y2="124"
+                        stroke="#64748B"
+                        strokeWidth="2"
+                        strokeDasharray="4 4"
+                      />
+
+                      {/* Punto T-1 Creatinina */}
+                      <circle cx="80" cy="126" r="3.5" fill="#64748B" stroke="#FFFFFF" strokeWidth="1.5" />
+                      <text x="80" y="140" textAnchor="middle" fontSize="8.5" fontWeight="600" className="font-mono" fill="#64748B">
+                        Cr {creatPrev}
                       </text>
-                      <text x="310" y="74" textAnchor="middle" fontSize="9.5" fontWeight="800" className="font-mono" fill="#C2410C">
-                        eGFR {egfrAct} (-{pctEgfr}%)
+
+                      {/* Punto T Creatinina */}
+                      <circle cx="360" cy="124" r="3.5" fill="#64748B" stroke="#FFFFFF" strokeWidth="1.5" />
+                      <g transform="translate(315, 134)">
+                        <rect width="90" height="15" rx="3" fill="#F1F5F9" stroke="#CBD5E1" strokeWidth="0.75" />
+                        <text x="45" y="11" textAnchor="middle" fontSize="8" fontWeight="700" className="font-mono" fill="#475569">
+                          Cr {creatAct} ("Normal")
+                        </text>
+                      </g>
+
+
+                      {/* --- EJE TEMPORAL INFERIOR --- */}
+                      <line x1="30" y1="152" x2="460" y2="152" stroke="#E2E8F0" strokeWidth="1" />
+                      <text x="80" y="160" textAnchor="middle" fontSize="8.5" fontWeight="600" fill="#64748B">
+                        Hace 12 meses
+                      </text>
+                      <text x="360" y="160" textAnchor="middle" fontSize="9" fontWeight="700" fill="#0F172A">
+                        Hoy (Consulta)
                       </text>
                     </svg>
 
-                    {/* Leyenda Simple */}
-                    <div className="flex items-center justify-between text-[10px] text-[#5A6573] pt-1 border-t border-[#E3E6EB] mt-1">
+                    {/* Leyenda limpia inferior */}
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-200/80 mt-2">
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-0.5 bg-[#5A6573] inline-block" />
-                        <span>Creatinina: <strong>Plana</strong> en rango normal</span>
+                        <span className="w-3 h-0.5 bg-slate-500 inline-block" />
+                        <span>Creatinina: <strong>Plana</strong> en rango estándar</span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-[#C2410C]">
-                        <span className="w-2.5 h-1 bg-[#C2410C] rounded-full inline-block" />
-                        <span>Filtrado: <strong>Caída de {Math.abs(deltaEgfr)} mL/min</strong></span>
+                      <div className="flex items-center gap-1.5 text-rose-700">
+                        <span className="w-2.5 h-1 bg-rose-600 rounded-full inline-block" />
+                        <span>Filtrado: <strong>Caída acelerada de {Math.abs(deltaEgfr)} mL/min</strong></span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Recomendación Clínica Resumida */}
-                <div className="text-[11px] text-[#0E1621] bg-[#F6F7F9] p-2 rounded-[4px] border border-[#E3E6EB] flex items-center justify-between">
-                  <div>
-                    <span className="text-[#1D3B6B] font-bold">Pauta inmediata: </span>
-                    <span>Iniciar iSGLT2 (Dapagliflozina 10mg) • Prohibir AINEs • Control 60d</span>
+                {/* 4. Fila de Acciones Clínicas: Chips Clínicos Interactivos */}
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[11px] font-semibold text-slate-700 block">
+                    Pauta Inmediata para el Médico:
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50/90 text-blue-900 border border-blue-200 text-[11px] font-medium">
+                      <Pill className="w-3 h-3 text-blue-700" />
+                      <span>Iniciar iSGLT2 (Dapagliflozina / Empagliflozina 10mg)</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-50/90 text-rose-900 border border-rose-200 text-[11px] font-medium">
+                      <AlertTriangle className="w-3 h-3 text-rose-700" />
+                      <span>Prohibir AINEs (Ibuprofeno/Naproxeno)</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50/90 text-emerald-900 border border-emerald-200 text-[11px] font-medium">
+                      <Calendar className="w-3 h-3 text-emerald-700" />
+                      <span>Control 60d (UACR enfermería)</span>
+                    </span>
                   </div>
                 </div>
+
               </div>
 
-              {/* Botones de Decisión Rápida */}
-              <div className="px-4 py-2.5 bg-[#FAFBFD] border-t border-[#E3E6EB] flex items-center justify-end gap-2 shrink-0">
+              {/* 5. Botones de Acción de Alta Gama */}
+              <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-200/80 flex items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => onOpenCarePlan?.(patient)}
-                  className="px-3 py-1.5 rounded-[4px] border border-[#CBD0D8] hover:bg-[#F0F2F5] text-[#0E1621] text-[11px] font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-                  title="Generar hoja de cuidados para entregar al paciente en mano"
+                  className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium px-3.5 py-2 rounded-lg text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  title="Generar e imprimir hoja de cuidados para entregar al paciente"
                 >
-                  <Printer className="w-3.5 h-3.5 text-[#5A6573]" />
+                  <Printer className="w-3.5 h-3.5 text-slate-500" />
                   <span>Hoja para el paciente</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => onSelectPatient?.(patient)}
-                  className="px-3.5 py-1.5 rounded-[4px] bg-[#1D3B6B] hover:bg-[#162E54] text-white text-[11px] font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-medium px-4 py-2 rounded-lg text-xs shadow-sm flex items-center gap-2 cursor-pointer transition-colors"
                 >
                   <span>Priorizar en consulta / Ver decisión</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
+
             </div>
           );
         })}
