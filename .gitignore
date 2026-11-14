@@ -40,6 +40,4 @@ htmlcov/
 node_modules/
 .vite/
 
-# Permitir que el build compilado del frontend viaje en Git para que el servidor FastAPI lo sirva directamente en /
-!app/frontend/dist/
-!app/frontend/dist/**
+app/frontend/dist
