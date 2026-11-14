@@ -1,0 +1,46 @@
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, Field
+
+
+class RiesgoItem(BaseModel):
+    valor: float = Field(..., ge=0.0, le=1.0, description="Probabilidad estimada (0.0 a 1.0)")
+    umbral: float = Field(..., ge=0.0, le=1.0, description="Umbral clínico de alerta")
+    alerta: bool = Field(..., description="True si supera el umbral de alerta")
+    interpretacion: str = Field(..., description="Explicación clínica concisa")
+
+
+class TiposRiesgo(BaseModel):
+    riesgo_aterosclerotico: RiesgoItem = Field(..., description="Riesgo ASCVD (Infarto / Ictus)")
+    riesgo_insuficiencia_cardiaca: RiesgoItem = Field(..., description="Riesgo de Insuficiencia Cardíaca")
+    riesgo_cardiorrenal: RiesgoItem = Field(..., description="Riesgo de Deterioro Renal Silencioso")
+
+
+class FactorClave(BaseModel):
+    variable: str = Field(..., description="Nombre técnico de la variable")
+    valor_actual: str = Field(..., description="Valor formateado con unidades clínicas")
+    impacto: str = Field(..., description="Impacto porcentual estimado (+X% / -X%)")
+    descripcion: str = Field(..., description="Justificación médica del impacto")
+    fuente: str = Field("Laboratorio", description="Origen o categoría clínica del dato")
+
+
+class EvaluationResponse(BaseModel):
+    hay_riesgo: bool = Field(..., description="False si ningún umbral se supera (perfil bajo control)")
+    conclusion_diagnostica: str = Field(..., description="Veredicto diagnóstico integral")
+    nivel_prioridad: str = Field(..., description="Nivel de prioridad: BAJA, MEDIA o ALTA")
+    tipos_riesgo: TiposRiesgo = Field(..., description="Desglose multidimensional de los 3 fenotipos")
+    factores_clave: List[FactorClave] = Field(default_factory=list, description="Factores explicativos SHAP")
+    recomendacion_preventiva: str = Field(..., description="Acción médica preventiva sugerida")
+
+
+class AnaliticaItem(BaseModel):
+    archivo: str
+    tamano_bytes: int
+    fecha_modificacion: str
+    tiene_progresion: bool
+    datos_resumen: Dict[str, Any] = Field(default_factory=dict)
+
+
+class AnaliticaEvaluadaItem(BaseModel):
+    archivo: str
+    evaluacion: EvaluationResponse
+    datos_entrada: Dict[str, Any]

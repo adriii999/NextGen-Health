@@ -45,13 +45,41 @@ La librería **`shap` (`TreeExplainer`)** se utiliza para:
 
 ---
 
+## 🚀 Inicio Rápido del Backend
+
+### 1. Iniciar el Servidor API
+```bash
+# Con Python directo
+python scripts/run_backend.py
+
+# O con PowerShell en Windows
+.\scripts\run_backend.ps1
+```
+* **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
+* **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+* **Health Check:** [http://localhost:8000/api/health](http://localhost:8000/api/health)
+
+### 2. Ejecutar la Suite de Pruebas (TDD)
+```bash
+python scripts/run_tests.py
+# o bien
+pytest tests -v
+```
+
+### 3. Generar Analíticas de Prueba
+```bash
+python scripts/seed_sample_analiticas.py
+```
+
+---
+
 ## 📂 Estructura del Repositorio
 
 ```text
 NextGen-Health/
 |-- app/
 |   |-- frontend/      # UI React: Analizador de carpeta + Simulador dual
-|   \-- backend/       # API FastAPI: /api/predict y /api/analiticas
+|   \-- backend/       # API FastAPI: /api/predict, /api/analiticas y /api/health
 |-- data/
 |   |-- analiticas/    # Carpeta con las analíticas para la demo (CSV / JSON)
 |   |-- raw/           # Datasets de entrenamiento originales
@@ -64,5 +92,10 @@ NextGen-Health/
 |   |-- Enunciado-Reto1.docx              # Enunciado original del reto
 |   |-- f.md                              # Documento de fuentes de referencia
 |   \-- estructura-repo.md                # Detalle de directorios
+|-- scripts/
+|   |-- run_backend.py                    # Script de arranque del backend FastAPI
+|   |-- run_tests.py                      # Ejecución de la suite pytest
+|   \-- seed_sample_analiticas.py         # Generador de analíticas de prueba
+|-- tests/                                # Suite de pruebas TDD (API, schemas, services)
 \-- README.md
 ```
