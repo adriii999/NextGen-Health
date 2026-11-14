@@ -1,93 +1,17 @@
-// src/components/charts/ShapImpactBar.jsx
-import React from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  ReferenceLine,
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 
-export const ShapImpactBar = ({ factoresClave = [] }) => {
-  if (!factoresClave || factoresClave.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-48 text-slate-400 text-xs">
-        Sin factores SHAP disponibles
-      </div>
-    );
-  }
-
-  const data = factoresClave.map((f) => {
-    const rawVal = parseFloat(String(f.impacto).replace('%', '').replace('+', ''));
-    return {
-      variable: f.variable,
-      impactoNumerico: isNaN(rawVal) ? 0 : rawVal,
-      descripcion: f.descripcion,
-      valorActual: f.valor_actual,
-      fuente: f.fuente || 'Laboratorio',
-    };
-  });
-
+export function ShapImpactBar({ factoresClave = [] }) {
+  const factors = Array.isArray(factoresClave) ? factoresClave : [];
+  const data = factors.map((factor) => {
+    const match = String(factor.impacto ?? '').trim().match(/^([+-]?\d+(?:[.,]\d+)?)%$/);
+    return { ...factor, value: match ? Number(match[1].replace(',', '.')) : null };
+  }).filter((factor) => factor.value !== null);
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-          Factores Explicativos de Riesgo (SHAP Attributions)
-        </h4>
-        <span className="text-[11px] text-slate-500 font-medium">
-          Rojo: Agrava riesgo / Verde: Factor protector
-        </span>
-      </div>
-      <div className="w-full h-56">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            layout="vertical"
-            data={data}
-            margin={{ top: 8, right: 24, left: 24, bottom: 8 }}
-          >
-            <XAxis
-              type="number"
-              unit="%"
-              stroke="#94a3b8"
-              tick={{ fontSize: 10 }}
-              domain={[-35, 35]}
-            />
-            <YAxis
-              type="category"
-              dataKey="variable"
-              stroke="#475569"
-              tick={{ fontSize: 11, fontWeight: 500 }}
-              width={110}
-            />
-            <ReferenceLine x={0} stroke="#cbd5e1" strokeWidth={1.5} />
-            <Tooltip
-              formatter={(val, name, item) => [
-                `${item.payload.impactoNumerico > 0 ? '+' : ''}${item.payload.impactoNumerico}% (${item.payload.valorActual})`,
-                item.payload.descripcion,
-              ]}
-              contentStyle={{
-                backgroundColor: '#ffffff',
-                borderRadius: '8px',
-                border: '1px solid #e2e8f0',
-                fontSize: '12px',
-              }}
-            />
-            <Bar dataKey="impactoNumerico" radius={[0, 4, 4, 0]}>
-              {data.map((entry, idx) => (
-                <Cell
-                  key={`cell-${idx}`}
-                  fill={entry.impactoNumerico > 0 ? '#e11d48' : '#10b981'}
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+    <div className="shap-chart">
+      <h3>Qué influye en el resultado</h3><p className="chart-caption">Contribuciones del modelo (SHAP). Explican la predicción, no una relación de causa y efecto.</p>
+      {data.length > 0 ? <div className="shap-canvas" style={{ height: Math.max(220, data.length * 48) }}><ResponsiveContainer width="100%" height="100%"><BarChart layout="vertical" data={data} margin={{ top: 12, right: 30, left: 0, bottom: 8 }} accessibilityLayer><XAxis type="number" unit="%" tick={{ fontSize: 12 }} /><YAxis type="category" dataKey="variable" width={115} tick={{ fontSize: 11 }} /><ReferenceLine x={0} stroke="#64748b" /><Tooltip formatter={(value) => [`${value}%`, 'Contribución devuelta']} /><Bar dataKey="value" isAnimationActive={false}>{data.map((factor, index) => <Cell key={index} fill={factor.value > 0 ? '#be4b50' : '#16786b'} />)}</Bar></BarChart></ResponsiveContainer></div>
+        : <p className="chart-empty">No hay contribuciones numéricas disponibles para la gráfica.</p>}
+      <ul className="factor-list">{factors.map((factor, index) => <li key={index}><div><strong>{factor.variable}</strong><span>{factor.valor_actual || 'Valor no disponible'} · Contribución: {factor.impacto || 'No disponible'}</span></div><p>{factor.descripcion}</p></li>)}</ul>
     </div>
   );
-};
-
-export default ShapImpactBar;
+}

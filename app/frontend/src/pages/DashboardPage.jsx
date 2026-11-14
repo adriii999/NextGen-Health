@@ -1,221 +1,104 @@
-// src/pages/DashboardPage.jsx
-import React, { useState } from 'react';
-import { RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
-import { KpiCard } from '../components/common/KpiCard';
-import { TableSkeleton } from '../components/common/TableSkeleton';
-import { PriorityPatientsSection } from '../components/folderView/PriorityPatientsSection';
-import { PatientTable } from '../components/folderView/PatientTable';
-import { PatientDrawer } from '../components/drawer/PatientDrawer';
-import { PatientCarePlanModal } from '../components/patientCare/PatientCarePlanModal';
-import { PatientActionView } from '../components/patientAction/PatientActionView';
-import { AnalyzeFolderButton } from '../components/common/AnalyzeFolderButton';
-import { analiticasService } from '../services/analiticasService';
-import { MOCK_PATIENTS } from '../mock/patientsData';
+import { useState } from 'react';
+import { FolderOpen, RefreshCw, Search, FileText, ArrowLeft, Activity, Check, AlertCircle } from 'lucide-react';
+import { analiticasService, analysisError } from '../services/analiticasService';
+import { PatientResults } from '../components/folderView/PatientResults';
+import { DEMO_FILES, DEMO_PATIENTS } from '../mock/frontendDemoData';
 
 export const DashboardPage = () => {
-  const [patients, setPatients] = useState(MOCK_PATIENTS);
-  const [selectedPatient, setSelectedPatient] = useState(null);
-  const [carePlanPatient, setCarePlanPatient] = useState(null);
-  const [intervenePatient, setIntervenePatient] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [notification, setNotification] = useState(null);
+  const demoMode = new URLSearchParams(window.location.search).get('demo') === '1';
+  const [files, setFiles] = useState(demoMode ? DEMO_FILES : null);
+  const [patients, setPatients] = useState(demoMode ? DEMO_PATIENTS : null);
+  const [selected, setSelected] = useState(demoMode ? DEMO_PATIENTS[0].id : null);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const [health, setHealth] = useState(null);
+  const [search, setSearch] = useState('');
+  const [priority, setPriority] = useState('');
 
-  // Guardar Plan de Intervención Clínica y Notificar Cita
-  const handleSaveIntervention = (patientId, planData) => {
-    setPatients((prev) =>
-      prev.map((p) => {
-        if (p.id === patientId) {
-          return {
-            ...p,
-            intervenido: true,
-            intervencion: planData,
-            estado_intervencion: `Intervenido / ${planData.triageLabel}`,
-          };
-        }
-        return p;
-      })
-    );
-
-    const targetPatient = patients.find((p) => p.id === patientId);
-    const pName = targetPatient?.nombre || 'Paciente';
-
-    setNotification({
-      type: 'success',
-      text: `Plan de intervención clínica guardado: Cita reasignada (${planData.triageLabel}) y conciliación farmacológica completada para ${pName}.`,
-    });
-  };
-
-  // Análisis en 1 Clic con simulación de progreso
-  const handleAnalyzeFolder = async () => {
-    setLoading(true);
-    setNotification(null);
-    try {
-      const res = await analiticasService.analizarCarpeta();
-      if (res.success && res.pacientes?.length > 0) {
-        setPatients(res.pacientes);
-        setNotification({
-          type: res.isDemo ? 'info' : 'success',
-          text: res.isDemo
-            ? `Análisis de cupo completado: ${res.pacientes.length} analíticas evaluadas con motor CDSS de referencia.`
-            : `Evaluación en tiempo real completada: ${res.pacientes.length} pacientes estratificados vía FastAPI.`,
-        });
-      }
-    } catch (err) {
-      setNotification({
-        type: 'error',
-        text: 'Error al contactar con el servicio de análisis de analíticas.',
-      });
-    } finally {
-      setLoading(false);
+  async function loadFiles() {
+    setBusy('files'); setError('');
+    setPatients(null); setSelected(null); setFiles(null);
+    if (demoMode) {
+      setFiles(DEMO_FILES);
+      setHealth({ online: false, modelo_cargado: false });
+      setBusy('');
+      return;
     }
-  };
+    try {
+      const [response, status] = await Promise.all([analiticasService.getArchivosAnaliticas(), analiticasService.checkHealth()]);
+      setFiles(response.archivos); setHealth(status);
+    } catch (err) { setError(analysisError(err)); }
+    finally { setBusy(''); }
+  }
 
-  // Contadores para KPIs
-  const total = patients.length;
-  const ocultos = patients.filter((p) => p.categoria === 'OCULTO').length;
-  const altos = patients.filter((p) => p.categoria === 'ALTO').length;
-  const controlados = patients.filter((p) => p.categoria === 'CONTROLADO').length;
+  async function analyze() {
+    setBusy('analysis'); setError(''); setPatients(null); setSelected(null);
+    if (demoMode) {
+      setPatients(DEMO_PATIENTS);
+      setBusy('');
+      return;
+    }
+    try {
+      const response = await analiticasService.analizarCarpeta();
+      setPatients(response.pacientes);
+    } catch (err) { setError(analysisError(err)); }
+    finally { setBusy(''); }
+  }
+
+  const filtered = (patients || []).filter((p) =>
+    `${p.nombre} ${p.archivo}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()) &&
+    (!priority || p.nivel_prioridad === priority));
+  const patient = patients?.find((p) => p.id === selected);
 
   return (
-    <div className="space-y-5">
-      {/* Barra de Acciones Principales de Consulta */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-3.5 rounded-[6px] border border-[#E3E6EB]">
-        <div>
-          <h2 className="text-[14px] font-semibold text-[#0E1621]">
-            Cupo de Atención Primaria • Detección Precoz del Riesgo Silente
-          </h2>
-          <p className="text-[12px] text-[#5A6573] mt-0.5">
-            Cruce de analíticas actuales con historial interanual de 12 meses (Modo B)
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleAnalyzeFolder()}
-            className="px-3 py-1.5 rounded-[6px] border border-[#E3E6EB] hover:bg-[#F6F7F9] text-[#5A6573] text-[12px] font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-            title="Refrescar lista de analíticas"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Sincronizar</span>
-          </button>
-          <AnalyzeFolderButton onAnalyze={handleAnalyzeFolder} loading={loading} />
-        </div>
+    <div className="workspace">
+      <div className="page-heading">
+        <div><p className="eyebrow">Consulta · Revisión individual</p><h1>Revisar un paciente</h1><p>Consulta sus riesgos, entiende el resultado y revisa los datos de la analítica.</p></div>
+        <details className="review-tools">
+          <summary>{demoMode ? 'Opciones de prueba' : 'Opciones de analíticas'}</summary>
+          <div className="review-tools-content">
+          <p>{demoMode ? 'Vuelve al inicio del flujo para probar la carga y el análisis con datos ficticios.' : 'Carga los archivos del servicio para preparar un nuevo lote de resultados.'}</p>
+          <button className="button secondary" onClick={(event) => { event.currentTarget.closest('details').open = false; loadFiles(); }} disabled={!!busy}>
+          {files ? <RefreshCw size={18} aria-hidden="true" /> : <FolderOpen size={18} aria-hidden="true" />}
+          {busy === 'files' ? 'Cargando analíticas…' : files ? 'Actualizar archivos' : 'Cargar analíticas'}
+        </button>
+          </div>
+        </details>
       </div>
 
-      {notification && (
-        <div
-          className={`px-3.5 py-2.5 rounded-[6px] text-[12px] flex items-center justify-between border ${
-            notification.type === 'success'
-              ? 'bg-[#E6F4EC] border-[#BDDFC9] text-[#16563C]'
-              : notification.type === 'info'
-              ? 'bg-[#E8EEF7] border-[#CBD0D8] text-[#1D3B6B]'
-              : 'bg-[#FBEAE9] border-[#F5C2C0] text-[#8C1D18]'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {notification.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-[#1F7A55] shrink-0" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-[#1D3B6B] shrink-0" />
-            )}
-            <span>{notification.text}</span>
-          </div>
-          <button
-            onClick={() => setNotification(null)}
-            className="text-[11px] underline ml-3 cursor-pointer"
-          >
-            Entendido
-          </button>
-        </div>
+      {demoMode && <div className="demo-banner" role="note"><strong>Modo demo, datos completamente ficticios.</strong><span>No son pacientes ni predicciones reales. No se consulta ni se envía información al backend.</span></div>}
+
+      {!patients && <ol className="workflow" aria-label="Proceso de revisión">
+        <li className={files ? 'complete' : 'current'}><span>{files ? <Check size={16} /> : '1'}</span><div><strong>Cargar analíticas</strong><small>Archivos disponibles</small></div></li>
+        <li className={patients ? 'complete' : files?.length ? 'current' : ''}><span>{patients ? <Check size={16} /> : '2'}</span><div><strong>Analizar el lote</strong><small>Evaluación del modelo</small></div></li>
+        <li className={patients ? 'current' : ''}><span>3</span><div><strong>Revisar un paciente</strong><small>Resultados y explicación</small></div></li>
+      </ol>}
+
+      {error && <div className="error-notice" role="alert"><AlertCircle size={20} aria-hidden="true" /><div><strong>No se ha completado la operación</strong><p>{error}</p></div></div>}
+      <div role="status" aria-live="polite" className="sr-only">{busy === 'analysis' ? 'Analizando las analíticas. Espera a que termine el proceso.' : patients ? `${patients.length} resultados disponibles.` : ''}</div>
+
+      {!patients && (
+        <section className="surface intake" aria-busy={!!busy}>
+          <div className="section-heading"><div><h2>Analíticas disponibles</h2><p>Archivos JSON y CSV de la carpeta del servicio.</p></div>{files && <span className="count-label">{files.length} archivos</span>}</div>
+          {files === null ? <div className="empty-state"><FolderOpen size={40} strokeWidth={1.4} aria-hidden="true" /><h3>{busy ? 'Cargando archivos…' : 'Empieza por cargar las analíticas'}</h3><p>Consulta los archivos disponibles antes de enviarlos al modelo.</p></div>
+            : files.length === 0 ? <div className="empty-state"><h3>No hay analíticas disponibles</h3><p>Añade archivos a data/analiticas/ en el servidor y actualiza la lista.</p></div>
+            : <><ul className="file-list">{files.map((file) => <li key={file.archivo}><FileText size={22} aria-hidden="true" /><div><strong>{file.archivo}</strong><small>Modificado: {file.fecha_modificacion || 'No disponible'} · {Number.isFinite(file.tamano_bytes) ? `${(file.tamano_bytes / 1024).toLocaleString('es-ES', { maximumFractionDigits: 1 })} KB` : 'Tamaño no disponible'}</small></div><span className="file-context">{file.tiene_progresion ? 'Con evolución' : 'Analítica aislada'}</span></li>)}</ul>
+            <div className="intake-action"><div><strong>Analiza todos los archivos disponibles</strong><p>{health?.modelo_cargado ? 'Modelo disponible. El resultado se mostrará por paciente.' : 'La disponibilidad del modelo se comprobará al analizar.'} Un CSV puede contener varios pacientes.</p></div><button className="button primary" onClick={analyze} disabled={!!busy}><Activity size={18} aria-hidden="true" />{busy === 'analysis' ? 'Analizando lote…' : 'Analizar lote'}</button></div></>}
+        </section>
       )}
 
-      {/* Fila de Métricas KPIs (Exactamente 4 según la especificación clínica) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* KPI 1 & 2: Riesgo Oculto Silencioso (Hero, 2 columnas) */}
-        <KpiCard
-          label="Riesgo Oculto Silencioso Detectado"
-          value={ocultos}
-          context={`${total > 0 ? Math.round((ocultos / total) * 100) : 0}% del cupo monitorizado. Creatinina estándar en rango normal, pero caída acelerada del filtrado glomerular y microalbuminuria.`}
-          isHero={true}
-          colSpan="sm:col-span-2"
-        />
-
-        {/* KPI 3: Alto Riesgo Evidente */}
-        <KpiCard
-          label="Alto Riesgo Evidente"
-          value={altos}
-          context="Dislipidemia severa y cifras tensionales descompensadas que superan los umbrales clínicos de alerta ASCVD."
-          isHero={false}
-          colSpan="col-span-1"
-        />
-
-        {/* KPI 4: Pacientes Evaluados */}
-        <KpiCard
-          label="Pacientes en Cupo"
-          value={total}
-          context={`${controlados} pacientes con función cardiorrenal bajo control óptimo y parámetros estables.`}
-          isHero={false}
-          colSpan="col-span-1"
-        />
-      </div>
-
-      {/* SECCIÓN "A QUIÉN MIRAR HOY": Tarjetas de Pacientes con Riesgo Oculto */}
-      <PriorityPatientsSection
-        patients={patients}
-        onSelectPatient={(p) => setSelectedPatient(p)}
-        onOpenCarePlan={(p) => setCarePlanPatient(p)}
-        onIntervenePatient={(p) => setIntervenePatient(p)}
-      />
-
-      {/* Tabla de Decisiones Clínicas (Sin scroll horizontal, etiquetas directas) */}
-      {loading ? (
-        <div className="bg-white rounded-[6px] border border-[#E3E6EB] p-4">
-          <div className="text-[12px] font-semibold text-[#1D3B6B] mb-3 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#1D3B6B] animate-pulse" />
-            <span>Procesando analíticas y extrayendo trayectorias temporales...</span>
-          </div>
-          <TableSkeleton rows={5} />
-        </div>
-      ) : (
-        <PatientTable
-          patients={patients}
-          onSelectPatient={(p) => setSelectedPatient(p)}
-          onIntervenePatient={(p) => setIntervenePatient(p)}
-        />
-      )}
-
-      {/* Drawer Lateral Deslizante para Detalle Clínico de 2ª Opinión */}
-      {selectedPatient && (
-        <PatientDrawer
-          patient={selectedPatient}
-          onClose={() => setSelectedPatient(null)}
-          onIntervenePatient={(p) => {
-            setSelectedPatient(null);
-            setIntervenePatient(p);
-          }}
-        />
-      )}
-
-      {/* Vista y Flujo de Intervención Médica Rápida */}
-      <PatientActionView
-        isOpen={!!intervenePatient}
-        onClose={() => setIntervenePatient(null)}
-        patient={intervenePatient}
-        onSavePlan={handleSaveIntervention}
-        onOpenCarePlan={(p) => {
-          setIntervenePatient(null);
-          setCarePlanPatient(p);
-        }}
-      />
-
-      {/* Modal de Hoja de Cuidados para el Paciente */}
-      <PatientCarePlanModal
-        isOpen={!!carePlanPatient}
-        onClose={() => setCarePlanPatient(null)}
-        patient={carePlanPatient}
-      />
+      {patients && <div className={`review-layout ${patient ? 'has-selection' : ''}`}>
+        <aside className="surface patient-sidebar" aria-label="Seleccionar paciente">
+          <div className="section-heading"><div><h2>Pacientes</h2><p>{patients.length} resultados del lote</p></div><button className="icon-button" onClick={() => { setPatients(null); setSelected(null); }} aria-label="Volver a los archivos"><ArrowLeft size={20} /></button></div>
+          <div className="patient-filters"><label htmlFor="patient-search">Buscar paciente o archivo</label><div className="search-field"><Search size={18} aria-hidden="true" /><input id="patient-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre o archivo" /></div><label htmlFor="priority">Prioridad de revisión</label><select id="priority" value={priority} onChange={(event) => setPriority(event.target.value)}><option value="">Todas las prioridades</option><option value="ALTA">Alta</option><option value="MEDIA">Media</option><option value="BAJA">Baja</option></select></div>
+          <ul className="patient-list">{filtered.map((p) => <li key={p.id}><button className={selected === p.id ? 'selected' : ''} aria-pressed={selected === p.id} onClick={() => setSelected(p.id)}><span className="patient-row"><strong>{p.nombre}</strong><span className={`priority priority-${p.nivel_prioridad}`}>{p.nivel_prioridad || 'Sin prioridad'}</span></span><span className="patient-meta">{p.edad !== null ? `${p.edad} años · ` : ''}{p.tiene_progresion ? 'Con evolución' : 'Sin evolución disponible'}</span><span className="patient-reason">{p.disparador_principal || 'Consulta la evaluación del modelo.'}</span></button></li>)}</ul>
+          {!filtered.length && <p className="list-empty">{patients.length ? 'No hay resultados con estos filtros.' : 'El servicio no devolvió pacientes evaluables.'}</p>}
+        </aside>
+        <section className="surface results-panel" aria-label="Resultado del paciente">
+          {patient ? <><button className="button secondary mobile-back" onClick={() => setSelected(null)}><ArrowLeft size={18} />Volver a pacientes</button><PatientResults key={patient.id} patient={patient} /></>
+            : <div className="empty-state selection-empty"><Activity size={42} strokeWidth={1.3} aria-hidden="true" /><h2>Selecciona un paciente</h2><p>Verás su valoración, los parámetros de la analítica y los factores que explican el resultado.</p><span className="quiet-label">Cada resultado pertenece a una analítica del lote.</span></div>}
+        </section>
+      </div>}
     </div>
   );
 };
-
-export default DashboardPage;
