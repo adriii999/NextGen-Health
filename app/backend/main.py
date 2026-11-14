@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -25,12 +25,6 @@ async def lifespan(app: FastAPI):
 
     # Asegurar que data/analiticas exista
     settings.ANALITICAS_DIR.mkdir(parents=True, exist_ok=True)
-    
-    # Montar assets estáticos del frontend si ya se ha compilado (npm run build)
-    assets_dir = settings.FRONTEND_DIST_DIR / "assets"
-    if assets_dir.exists() and assets_dir.is_dir():
-        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
-        print(f"[OK] Assets estáticos de React montados desde {assets_dir}")
 
     print("Servidor listo para recibir consultas.")
     print("=" * 60)
@@ -58,47 +52,47 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Montaje de routers con prefijo /api
+# Montaje de routers de la API con prefijo /api
 app.include_router(health.router, prefix=settings.API_PREFIX)
 app.include_router(predict.router, prefix=settings.API_PREFIX)
 app.include_router(analiticas.router, prefix=settings.API_PREFIX)
 
+# Montar carpeta assets del frontend compilado si existe
+assets_dir = settings.FRONTEND_DIST_DIR / "assets"
+if assets_dir.exists() and assets_dir.is_dir():
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
 
-@app.get("/", tags=["Frontend & Root"])
-def root():
+
+@app.get("/{full_path:path}", tags=["Frontend SPA"])
+def serve_frontend_spa(full_path: str = ""):
     """
-    Ruta raíz '/':
-    1. Si el frontend React ya ha sido compilado ('npm run build' -> app/frontend/dist),
-       sirve directamente el archivo index.html para visualización inmediata de la app.
-    2. Si el frontend está en desarrollo, devuelve la guía explícita de conexión para
-       que el agente o desarrollador de Frontend conecte React a esta API.
+    Servicio directo de la aplicación Frontend en '/':
+    1. Si se solicita un archivo estático específico en dist (ej. favicon.svg, icons.svg), lo devuelve.
+    2. Si el frontend está compilado ('app/frontend/dist/index.html'), sirve el SPA de React en '/'.
+    3. Si el build aún no se ha generado, devuelve un JSON informativo con el estado y los endpoints.
     """
+    # Si la petición apunta a un archivo estático existente en dist (ej. favicon.svg)
+    if full_path:
+        static_file = settings.FRONTEND_DIST_DIR / full_path
+        if static_file.is_file():
+            return FileResponse(static_file)
+
+    # Servir la aplicación React (Single Page Application)
     index_html = settings.FRONTEND_DIST_DIR / "index.html"
     if index_html.exists() and index_html.is_file():
         return FileResponse(index_html)
 
+    # Fallback si no se ha ejecutado 'npm run build' en app/frontend
     return {
         "status": "online",
         "proyecto": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "frontend_connection_guide": {
-            "mensaje": "Guía de conexión para el agente o desarrollador de Frontend (React)",
-            "modo_desarrollo": {
-                "frontend_dev_server": "http://localhost:5173",
-                "backend_api_url": f"http://localhost:{settings.PORT}{settings.API_PREFIX}",
-                "recomendacion_vite": "Configurar proxy en vite.config.js para redirigir '/api' a 'http://localhost:8000'",
-                "cors_habilitado": True,
-            },
-            "modo_produccion_entrega": {
-                "instruccion": "Ejecutar 'npm run build' en app/frontend. Al crearse 'app/frontend/dist/index.html', el backend servirá automáticamente la web en '/'",
-                "ruta_dist_esperada": str(settings.FRONTEND_DIST_DIR),
-            },
-            "endpoints_principales": {
-                "health": f"{settings.API_PREFIX}/health",
-                "analiticas_listado": f"{settings.API_PREFIX}/analiticas",
-                "analizar_carpeta_1clic": f"{settings.API_PREFIX}/analiticas/analizar-carpeta",
-                "predict_simulador": f"{settings.API_PREFIX}/predict",
-                "documentacion_swagger": "/docs",
-            },
+        "aviso": "Frontend React pendiente de compilar. Ejecuta 'npm run build' en app/frontend para ver la app aquí.",
+        "endpoints_disponibles": {
+            "health": f"{settings.API_PREFIX}/health",
+            "analiticas": f"{settings.API_PREFIX}/analiticas",
+            "analizar_carpeta": f"{settings.API_PREFIX}/analiticas/analizar-carpeta",
+            "predict": f"{settings.API_PREFIX}/predict",
+            "documentacion": "/docs",
         },
     }

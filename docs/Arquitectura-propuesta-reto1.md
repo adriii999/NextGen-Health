@@ -110,7 +110,7 @@ En un entorno médico como la consulta de la Dra. Carmen, un algoritmo que actú
 | `egfr` | Filtrado Glomerular | $\text{mL/min}/1.73\text{m}^2$ (15 – 120) | Presente | Presente + **`delta_egfr`** |
 | `uacr` | Albúmina/Creatinina en orina | $\text{mg/g}$ (2 – 300) | Presente | Presente + **`delta_uacr`** |
 
-> **Variable Target (`target_cardio`):** Binaria (0/1), solo presente en los CSV históricos de entrenamiento para guiar la optimización de sensibilidad (Recall).
+> **Variables objetivo provisionales:** `target_aterosclerotico`, `target_insuficiencia_cardiaca` y `target_cardiorrenal`, cada una binaria (0/1) y presente únicamente en el CSV de entrenamiento. Los nombres se centralizan en `model/scripts/train_models.py` y deben ajustarse al esquema final. Cada etiqueta requiere una definición de evento y horizonte temporal confirmada por el equipo de datos antes de interpretar clínicamente sus resultados.
 
 ---
 
@@ -132,43 +132,60 @@ En un entorno médico como la consulta de la Dra. Carmen, un algoritmo que actú
 * `POST /api/analiticas/analizar-carpeta`: **(Flujo Principal en 1 Clic)** Analiza todos los archivos de la carpeta, ejecutando la inferencia y SHAP sobre cada uno.
 * `POST /api/predict`: **(Simulador / Demo)** Recibe un JSON (analítica actual o con bloque `progresion`) y devuelve la evaluación multidimensional con SHAP.
 
-#### Formato de Respuesta con Explicabilidad SHAP:
+#### Formato de Respuesta con Explicabilidad SHAP y Perfil Renal KDIGO 2024:
 ```json
 {
   "hay_riesgo": true,
-  "conclusion_diagnostica": "Alerta crítica: Aunque los valores absolutos parecen casi normales, la progresión temporal muestra una pérdida acelerada de filtrado glomerular (-14 mL/min) y triplicación de albuminuria.",
+  "conclusion_diagnostica": "Alerta crítica: Aunque los valores absolutos parecen casi normales, la progresión temporal muestra una pérdida acelerada de filtrado glomerular (-16 mL/min) y duplicación de albuminuria.",
   "nivel_prioridad": "ALTA",
   "tipos_riesgo": {
     "riesgo_aterosclerotico": { "valor": 0.08, "umbral": 0.10, "alerta": false, "interpretacion": "Bajo" },
     "riesgo_insuficiencia_cardiaca": { "valor": 0.16, "umbral": 0.08, "alerta": true, "interpretacion": "Alto (sobrecarga hemodinámica incipiente)" },
     "riesgo_cardiorrenal": { "valor": 0.28, "umbral": 0.12, "alerta": true, "interpretacion": "Muy Alto (deterioro renal acelerado)" }
   },
+  "perfil_renal": {
+    "estadio_gfr": "G2",
+    "estadio_uacr": "A2",
+    "cuadrante_kdigo": "ALTO",
+    "progresor_rapido": true,
+    "descripcion_clinica": "Estadio KDIGO G2-A2 (Riesgo ALTO). eGFR: 68.0 mL/min, uACR: 38.5 mg/g. ALERTA NEFROLÓGICA: Progresor rápido con caída de -16.0 mL/min/año (umbral patológico: -5 mL/min/año)."
+  },
   "factores_clave": [
     {
       "variable": "delta_egfr",
-      "valor_actual": "-14.0 mL/min",
-      "impacto": "+18%",
-      "descripcion": "Pérdida acelerada de filtrado glomerular (-14 mL/min/año) indica daño renal progresivo activo.",
+      "valor_actual": "-16.0 mL/min",
+      "impacto": "+26%",
+      "descripcion": "Pérdida acelerada de filtrado glomerular (-16 mL/min/año) indica daño renal progresivo activo.",
       "fuente": "Evolución Longitudinal"
     },
     {
       "variable": "delta_uacr",
-      "valor_actual": "+22.0 mg/g",
-      "impacto": "+15%",
-      "descripcion": "Incremento interanual de microalbuminuria (+22 mg/g) confirma estrés glomerular.",
+      "valor_actual": "+24.0 mg/g",
+      "impacto": "+101%",
+      "descripcion": "Incremento interanual de microalbuminuria (+24 mg/g) confirma estrés glomerular.",
       "fuente": "Evolución Longitudinal"
     },
     {
-      "variable": "colesterol_total",
-      "valor_actual": "218.0 mg/dL",
-      "impacto": "+6%",
-      "descripcion": "Colesterol total (218 mg/dL) favorece la progresión de placa ateromatosa.",
-      "fuente": "Laboratorio Actual"
+      "variable": "diabetes",
+      "valor_actual": "Sí",
+      "impacto": "+18%",
+      "descripcion": "Diagnóstico de diabetes mellitus: multiplicador de progresión renal.",
+      "fuente": "Historial Clínico"
     }
   ],
-  "recomendacion_preventiva": "Intervención inmediata: Iniciar nefroprotección (iSGLT2 / ARA-II) y citación a 3 meses para frenar caída de eGFR."
+  "recomendacion_preventiva": "Intervención inmediata: Iniciar nefroprotección (iSGLT2 / ARA-II) y citación a 3 meses para frenar caída de eGFR y reducir albuminuria."
 }
 ```
+
+---
+
+## 8.1 Énfasis de Primer Nivel en Salud Renal (Guías KDIGO 2024)
+
+Para responder a la necesidad de **foco intensivo en el riñón**, el sistema incorpora 4 mecanismos clave:
+1. **La Trampa del Rango Normal:** En los laboratorios del SNS, valores de eGFR $> 60\text{ mL/min}$ suelen imprimirse sin asteriscos de alerta, lo que oculta pacientes que caen de 84 a 68 mL/min. El sistema detecta esta caída silente.
+2. **Matriz de Riesgo KDIGO (Semáforo Bi-dimensional):** Cruza el estadio de filtrado ($G1$ a $G5$) con el estadio de microalbuminuria ($A1: <30$, $A2: 30-300$, $A3: >300\text{ mg/g}$).
+3. **Detección de Progresor Rápido (*Rapid Progressor*):** Si $\Delta_{\text{eGFR}} \le -5.0\text{ mL/min/año}$, se eleva la prioridad automáticamente a ALTA con alerta de nefroprotección urgente.
+4. **Target de Entrenamiento con Daño Renal Compuesto:** Todo paciente con daño renal progresivo objetivo en el dataset es clasificado como evento prioritario ($target=1$), asegurando que los modelos de ML penalicen severamente los falsos negativos renales.
 
 ---
 
