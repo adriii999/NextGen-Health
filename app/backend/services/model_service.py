@@ -10,6 +10,7 @@ from app.backend.schemas.response import (
     TiposRiesgo,
     RiesgoItem,
     FactorClave,
+    PerfilRenalKDIGO,
 )
 from app.backend.services.shap_service import ShapService
 from app.backend.config import settings
@@ -159,6 +160,8 @@ class ModelService:
 
         hay_riesgo = ath_alert or hf_alert or ren_alert
 
+        perfil_renal = self._compute_kdigo_profile(features)
+
         if not hay_riesgo:
             return EvaluationResponse(
                 hay_riesgo=False,
@@ -172,6 +175,7 @@ class ModelService:
                 recomendacion_preventiva=(
                     "Continuar con controles habituales de Atención Primaria según protocolo general."
                 ),
+                perfil_renal=perfil_renal,
             )
 
         # Explicar cada fenotipo con el TreeExplainer de su propio clasificador.
@@ -221,6 +225,7 @@ class ModelService:
             tipos_riesgo=tipos_riesgo,
             factores_clave=factores_clave,
             recomendacion_preventiva=recomendacion,
+            perfil_renal=perfil_renal,
         )
 
     def _predict_with_real_model(self, features: Dict[str, Any]) -> Dict[str, float]:
@@ -283,3 +288,63 @@ class ModelService:
         recomendacion_txt = " ".join(recs)
 
         return conclusion_txt, recomendacion_txt, prioridad
+
+    def _compute_kdigo_profile(self, features: Dict[str, Any]) -> PerfilRenalKDIGO:
+        """Calcula la estratificación de riesgo renal según guías KDIGO 2024."""
+        egfr = float(features.get("egfr", 90.0))
+        uacr = float(features.get("uacr", 10.0))
+        delta_egfr = features.get("delta_egfr")
+
+        # 1. Estadio GFR
+        if egfr >= 90.0:
+            g_stage = "G1"
+        elif egfr >= 60.0:
+            g_stage = "G2"
+        elif egfr >= 45.0:
+            g_stage = "G3a"
+        elif egfr >= 30.0:
+            g_stage = "G3b"
+        elif egfr >= 15.0:
+            g_stage = "G4"
+        else:
+            g_stage = "G5"
+
+        # 2. Estadio Albuminuria
+        if uacr < 30.0:
+            a_stage = "A1"
+        elif uacr <= 300.0:
+            a_stage = "A2"
+        else:
+            a_stage = "A3"
+
+        # 3. Matriz de Riesgo KDIGO (Semáforo Cardiorrenal)
+        if g_stage in ["G1", "G2"]:
+            quadrant = "BAJO" if a_stage == "A1" else ("MODERADO" if a_stage == "A2" else "ALTO")
+        elif g_stage == "G3a":
+            quadrant = "MODERADO" if a_stage == "A1" else ("ALTO" if a_stage == "A2" else "MUY_ALTO")
+        elif g_stage == "G3b":
+            quadrant = "ALTO" if a_stage == "A1" else "MUY_ALTO"
+        else:
+            quadrant = "MUY_ALTO"
+
+        # 4. Alerta de Progresor Rápido KDIGO (pérdida >= 5 mL/min/año)
+        is_rapid = False
+        if delta_egfr is not None and not pd.isna(delta_egfr):
+            if float(delta_egfr) <= -5.0:
+                is_rapid = True
+                if quadrant == "BAJO":
+                    quadrant = "MODERADO"
+                elif quadrant == "MODERADO":
+                    quadrant = "ALTO"
+
+        desc = f"Estadio KDIGO {g_stage}-{a_stage} (Riesgo {quadrant}). eGFR: {egfr:.1f} mL/min, uACR: {uacr:.1f} mg/g."
+        if is_rapid:
+            desc += f" ALERTA NEFROLÓGICA: Progresor rápido con caída de {float(delta_egfr):.1f} mL/min/año (umbral patológico: -5 mL/min/año)."
+
+        return PerfilRenalKDIGO(
+            estadio_gfr=g_stage,
+            estadio_uacr=a_stage,
+            cuadrante_kdigo=quadrant,
+            progresor_rapido=is_rapid,
+            descripcion_clinica=desc,
+        )

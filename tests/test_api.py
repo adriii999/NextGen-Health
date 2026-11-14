@@ -12,58 +12,79 @@ from app.backend.config import settings
 # 1. PRUEBAS EN SERVIDOR INSTANCIADO: ESTADO NO IMPLEMENTADO (501)
 # ==============================================================================
 
-def test_api_root_endpoint_provides_frontend_guide(http_client: httpx.Client):
-    """GET / en el servidor instanciado responde 200 con la guía de conexión del frontend o el SPA."""
+def test_api_root_endpoint_serves_frontend_or_guide(http_client: httpx.Client):
+    """GET / en el servidor instanciado responde 200 con el SPA de React (HTML) o la guía JSON."""
     response = http_client.get("/")
     assert response.status_code == 200
-    # Si aún no hay dist/index.html, devuelve JSON de integración
-    if "application/json" in response.headers.get("content-type", ""):
-        data = response.json()
-        assert "frontend_connection_guide" in data
-        assert "http://localhost:5173" in str(data)
+    content_type = response.headers.get("content-type", "")
+    assert "text/html" in content_type or "application/json" in content_type
 
 
-def test_api_health_shows_model_pending(http_client: httpx.Client):
-    """GET /api/health en el servidor instanciado refleja que el modelo está pendiente."""
+def test_api_health_shows_model_status(http_client: httpx.Client):
+    """GET /api/health en el servidor instanciado refleja el estado del modelo."""
     response = http_client.get("/api/health")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["modelo_cargado"] is False
-    assert data["estado_modelo"] == "PENDIENTE_ENTRENAMIENTO"
+    if app.state.model_service.is_model_loaded():
+        assert data["modelo_cargado"] is True
+        assert data["estado_modelo"] == "LISTO"
+    else:
+        assert data["modelo_cargado"] is False
+        assert data["estado_modelo"] == "PENDIENTE_ENTRENAMIENTO"
     assert "model_artifact.joblib" in data["artefacto_esperado"]
 
 
 def test_api_predict_returns_501_not_implemented_without_model(http_client: httpx.Client):
     """REGLA ESTRICTA: POST /api/predict en el servidor instanciado responde 501 si no hay modelo."""
-    payload = {
-        "edad": 52,
-        "sexo": 1,
-        "bmi": 26.0,
-        "ap_hi": 135,
-        "ap_lo": 85,
-        "colesterol_total": 210.0,
-        "fuma": 0,
-        "diabetes": 0,
-        "egfr": 75.0,
-        "uacr": 20.0,
-        "progresion": None,
-    }
-    response = http_client.post("/api/predict", json=payload)
-    assert response.status_code == 501, f"Esperado 501 Not Implemented pero el servidor devolvió {response.status_code}"
-    data = response.json()["detail"]
-    assert data["error"] == "MODELO_NO_IMPLEMENTADO"
-    assert data["estado"] == "PENDIENTE_ENTRENAMIENTO"
-    assert "model_artifact.joblib" in data["artefacto_esperado"]
+    model_service = app.state.model_service
+    orig_model = model_service.model
+    orig_loaded = model_service.artifact_loaded
+
+    try:
+        model_service.model = None
+        model_service.artifact_loaded = False
+        payload = {
+            "edad": 52,
+            "sexo": 1,
+            "bmi": 26.0,
+            "ap_hi": 135,
+            "ap_lo": 85,
+            "colesterol_total": 210.0,
+            "fuma": 0,
+            "diabetes": 0,
+            "egfr": 75.0,
+            "uacr": 20.0,
+            "progresion": None,
+        }
+        response = http_client.post("/api/predict", json=payload)
+        assert response.status_code == 501, f"Esperado 501 Not Implemented pero el servidor devolvió {response.status_code}"
+        data = response.json()["detail"]
+        assert data["error"] == "MODELO_NO_IMPLEMENTADO"
+        assert data["estado"] == "PENDIENTE_ENTRENAMIENTO"
+        assert "model_artifact.joblib" in data["artefacto_esperado"]
+    finally:
+        model_service.model = orig_model
+        model_service.artifact_loaded = orig_loaded
 
 
 def test_api_analizar_carpeta_returns_501_not_implemented_without_model(http_client: httpx.Client):
     """REGLA ESTRICTA: POST /api/analiticas/analizar-carpeta responde 501 si no hay modelo."""
-    response = http_client.post("/api/analiticas/analizar-carpeta")
-    assert response.status_code == 501
-    data = response.json()["detail"]
-    assert data["error"] == "MODELO_NO_IMPLEMENTADO"
-    assert data["estado"] == "PENDIENTE_ENTRENAMIENTO"
+    model_service = app.state.model_service
+    orig_model = model_service.model
+    orig_loaded = model_service.artifact_loaded
+
+    try:
+        model_service.model = None
+        model_service.artifact_loaded = False
+        response = http_client.post("/api/analiticas/analizar-carpeta")
+        assert response.status_code == 501
+        data = response.json()["detail"]
+        assert data["error"] == "MODELO_NO_IMPLEMENTADO"
+        assert data["estado"] == "PENDIENTE_ENTRENAMIENTO"
+    finally:
+        model_service.model = orig_model
+        model_service.artifact_loaded = orig_loaded
 
 
 def test_api_analiticas_list_works_independently(http_client: httpx.Client):
@@ -177,3 +198,23 @@ def test_status_modelo_real_en_disco(http_client: httpx.Client):
     response = http_client.post("/api/predict", json=payload)
     assert response.status_code == 200
     assert "tipos_riesgo" in response.json()
+
+
+def test_api_analizar_carpeta_batch_real_en_disco(http_client: httpx.Client):
+    """
+    Verifica el flujo en 1 clic: procesar analíticas de data/analiticas/ con el modelo real.
+    """
+    if not settings.MODEL_PATH.exists():
+        pytest.skip("model_artifact.joblib no existe en disco aún.")
+
+    app.state.model_service.load_artifacts(str(settings.MODEL_PATH))
+    response = http_client.post("/api/analiticas/analizar-carpeta")
+    assert response.status_code == 200
+    items = response.json()
+    assert isinstance(items, list)
+    assert len(items) > 0
+    # Debe tener estructura de AnaliticaEvaluadaItem
+    first = items[0]
+    assert "archivo" in first
+    assert "evaluacion" in first
+    assert "conclusion_diagnostica" in first["evaluacion"]

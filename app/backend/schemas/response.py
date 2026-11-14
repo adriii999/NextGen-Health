@@ -23,6 +23,14 @@ class FactorClave(BaseModel):
     fuente: str = Field("Laboratorio", description="Origen o categoría clínica del dato")
 
 
+class PerfilRenalKDIGO(BaseModel):
+    estadio_gfr: str = Field(..., description="Estadio GFR según KDIGO: G1, G2, G3a, G3b, G4, G5")
+    estadio_uacr: str = Field(..., description="Estadio Albuminuria según KDIGO: A1, A2, A3")
+    cuadrante_kdigo: str = Field(..., description="Cuadrante de riesgo KDIGO: BAJO, MODERADO, ALTO o MUY_ALTO")
+    progresor_rapido: bool = Field(False, description="True si la pérdida de eGFR es >= 5 mL/min/año")
+    descripcion_clinica: str = Field(..., description="Interpretación clínica del estado cardiorrenal")
+
+
 class EvaluationResponse(BaseModel):
     hay_riesgo: bool = Field(..., description="False si ningún umbral se supera (perfil bajo control)")
     conclusion_diagnostica: str = Field(..., description="Veredicto diagnóstico integral")
@@ -30,6 +38,7 @@ class EvaluationResponse(BaseModel):
     tipos_riesgo: TiposRiesgo = Field(..., description="Desglose multidimensional de los 3 fenotipos")
     factores_clave: List[FactorClave] = Field(default_factory=list, description="Factores explicativos SHAP")
     recomendacion_preventiva: str = Field(..., description="Acción médica preventiva sugerida")
+    perfil_renal: Optional[PerfilRenalKDIGO] = Field(None, description="Estratificación renal detallada KDIGO 2024")
 
 
 class AnaliticaItem(BaseModel):
