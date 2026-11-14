@@ -16,7 +16,16 @@ This skill establishes the definitive engineering guidelines, UI/UX architecture
 * **Component Primitives:** Clean Tailwind-based accessible components (cards, badges, modals, tabs).
 * **Iconography:** `lucide-react` (standard stroke-width: 1.75px for medical instruments and indicators).
 * **Data Visualization:** `recharts` for radar charts (3 risk phenotypes), sparklines ($\Delta$ evolution), and bar charts (SHAP feature attributions).
-* **HTTP Client:** `axios` with an isolated API client instance.
+* **HTTP Client:** `axios` with an isolated API client instance:
+  ```javascript
+  // app/frontend/src/api/client.js
+  import axios from 'axios';
+
+  export const apiClient = axios.create({
+    baseURL: import.meta.env.VITE_API_URL || '/api', // En desarrollo usa proxy de Vite o http://localhost:8000/api
+    headers: { 'Content-Type': 'application/json' },
+  });
+  ```
 
 ---
 
