@@ -1,14 +1,14 @@
-# NextGen Health: Segunda Opinión Multidimensional de Riesgo Cardiovascular (Dual: Aislada y Progresión)
+# NextGen Health: revisión experimental de analíticas
 
-Herramienta clínica de demostración (MVP) para **Atención Primaria**, diseñada para proporcionar una **segunda opinión en un solo clic** analizando archivos de analíticas depositados en una carpeta, identificando señales de riesgo cardiovascular oculto mediante una **arquitectura de evaluación dual** (analítica aislada y progresión temporal $\Delta$) y **explicabilidad médica transparente con SHAP**.
+Prototipo para Atención Primaria que analiza archivos de analíticas de una carpeta y presenta una lista orientativa de pacientes por revisar. Puede utilizar una analítica aislada o calcular cambios entre visitas.
 
-> **Estado:** Prototipo funcional (demo ligera sin base de datos) desarrollado para el Datathon.
+> **Estado:** Demo experimental sin base de datos, sin integración con la historia clínica y sin validación clínica. No utilizar con pacientes reales ni como base de decisiones asistenciales.
 
 ---
 
 ## 🎯 Enfoque y Doble Funcionalidad Analítica
 
-En una consulta habitual de Atención Primaria (5–7 minutos por paciente), una analítica con valores aparentemente "aceptables" (ej. eGFR de 68 mL/min o UACR de 28 mg/g) puede enmascarar un riesgo cardiovascular severo si el paciente ha experimentado una **pérdida rápida de función renal o albuminuria creciente** respecto al año previo.
+La bandeja inicia el análisis al abrirse, muestra la fecha de revisión y permite abrir cada ficha. Los registros con datos insuficientes o inválidos quedan separados y no reciben una predicción.
 
 El sistema implementa dos modos de evaluación automáticos:
 
@@ -17,18 +17,17 @@ El sistema implementa dos modos de evaluación automáticos:
    * *Funcionamiento:* Procesa los 10 valores de laboratorio actuales. Los campos de progresión ($\Delta$) viajan como nulos (`NaN`), gestionados de forma nativa por XGBoost (`missing=np.nan`) sin romper la predicción.
 2. **Modo B (Progresión Temporal / Análisis Longitudinal):**
    * *Escenario:* Paciente con histórico analítico previo (~12 meses).
-   * *Funcionamiento:* Procesa los valores actuales y calcula las variaciones interanuales ($\Delta_{\text{eGFR}}$, $\Delta_{\text{UACR}}$, $\Delta_{\text{ap\_hi}}$, $\Delta_{\text{colesterol}}$, $\Delta_{\text{bmi}}$). Destapa el deterioro renal o hemodinámico silencioso antes de que los valores absolutos alcancen niveles críticos.
+   * *Funcionamiento:* Procesa los valores actuales y calcula variaciones anuales entre visitas cuando hay datos y fechas suficientes.
+
+La prioridad combina alertas del modelo y reglas experimentales sobre datos observados. Sus umbrales requieren revisión y validación clínica. La ausencia de alertas no descarta riesgo. Si las fuentes cambian, se muestra un aviso tras comprobarlas al volver a la ventana o periódicamente; el profesional puede solicitar una nueva revisión del cupo. No se actualizan pacientes individualmente.
 
 ---
 
 ## 🧠 ¿Para qué sirve SHAP (XAI) en este proyecto?
 
-Un modelo de Machine Learning que emite solo un número (ej. *"Riesgo: 82%"*) es una **caja negra** que ningún médico de Atención Primaria utilizaría. 
+La librería `shap` calcula atribuciones del modelo. Los porcentajes mostrados son aproximaciones, no puntos exactos de probabilidad ni evidencia de causalidad. Las puntuaciones no están validadas como probabilidades de eventos clínicos futuros.
 
-La librería **`shap` (`TreeExplainer`)** se utiliza para:
-1. **Abrir la caja negra:** Calcula la aportación matemática exacta de cada variable clínica al riesgo estimado.
-2. **Generar los Factores Clave (`factores_clave`):** Traduce los valores matemáticos en impactos porcentuales comprensibles para el doctor (ej. *"La pérdida de eGFR de -14 mL/min/año aporta un +18% al riesgo"* o *"El colesterol total aporta un +6%"*).
-3. **Guiar la Recomendación Médica:** Permite que el sistema emita una intervención preventiva dirigida a la causa raíz (ej. nefroprotección con iSGLT2 ante empeoramiento de UACR/eGFR).
+El prototipo no prescribe ni selecciona tratamientos. Una evaluación profesional debe considerar la historia clínica y las guías aplicables.
 
 ---
 
@@ -58,6 +57,8 @@ python scripts/run_backend.py
 * **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
 * **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 * **Health Check:** [http://localhost:8000/api/health](http://localhost:8000/api/health)
+
+La aplicación se abre en **http://localhost:8000**. Para actualizar la interfaz después de cambiar el frontend, ejecuta `npm install` y `npm run build` en `app/frontend/`; FastAPI sirve la compilación desde el mismo puerto. Si el artefacto de modelo no está disponible, la API devuelve HTTP 501 en lugar de predicciones inventadas.
 
 ### 2. Ejecutar la Suite de Pruebas (TDD)
 ```bash

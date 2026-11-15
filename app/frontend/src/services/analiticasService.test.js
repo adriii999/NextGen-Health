@@ -97,3 +97,29 @@ test('empty successful analysis clears results and malformed responses fail', as
   apiClient.defaults.adapter = async () => ({ data: {}, status: 200, headers: {}, config: {} });
   await assert.rejects(() => analiticasService.analizarCarpeta());
 });
+
+test('batch analysis preserves incomplete patients without fabricating risk values', async () => {
+  apiClient.defaults.adapter = async () => ({
+    data: [{
+      archivo: 'paciente_pendiente',
+      estado: 'DATOS_INSUFICIENTES',
+      campos_pendientes: ['uacr'],
+      errores_datos: [],
+      evaluacion: null,
+      datos_entrada: {
+        paciente_id: 'paciente_pendiente', nombre: 'Paciente pendiente',
+        edad: 64, egfr: 58, uacr: null, fecha_analitica: '2026-04-10',
+      },
+    }],
+    status: 200, headers: {}, config: {},
+  });
+
+  const [patient] = (await analiticasService.analizarCarpeta()).pacientes;
+
+  assert.equal(patient.estado, 'DATOS_INSUFICIENTES');
+  assert.deepEqual(patient.campos_pendientes, ['uacr']);
+  assert.equal(patient.valores_clave.egfr.actual, 58);
+  assert.equal(patient.valores_clave.uacr.actual, null);
+  assert.equal('hay_riesgo' in patient, false);
+  assert.equal(patient.nivel_prioridad, undefined);
+});
