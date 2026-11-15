@@ -337,16 +337,17 @@ class ShapService:
     def _format_value(self, var: str, val: Any) -> str:
         if val is None or (isinstance(val, float) and np.isnan(val)):
             return "No disponible"
+        sign = "+" if var.startswith("delta_") and float(val) > 0 else ""
         if var in ["colesterol_total", "delta_colesterol"]:
-            return f"{float(val):.0f} mg/dL"
+            return f"{sign}{float(val):.0f} mg/dL"
         if var in ["egfr", "delta_egfr"]:
-            return f"{float(val):.1f} mL/min"
+            return f"{sign}{float(val):.1f} mL/min"
         if var in ["uacr", "delta_uacr"]:
-            return f"{float(val):.1f} mg/g"
+            return f"{sign}{float(val):.1f} mg/g"
         if var in ["ap_hi", "ap_lo", "delta_ap_hi"]:
-            return f"{float(val):.0f} mmHg"
+            return f"{sign}{float(val):.0f} mmHg"
         if var in ["bmi", "delta_bmi"]:
-            return f"{float(val):.1f} kg/m²"
+            return f"{sign}{float(val):.1f} kg/m²"
         if var == "edad":
             return f"{float(val):.0f} años"
         if var == "diabetes":

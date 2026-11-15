@@ -21,6 +21,14 @@ def live_server_url():
     Instancia un servidor real Uvicorn en un hilo en background escuchando en un puerto real.
     Cada proceso de pytest-xdist tendrá su propio servidor instanciado de forma paralela.
     """
+    # Asegurar que app.state.model_service esté inicializado en el proceso de tests
+    from app.backend.services.model_service import ModelService
+    if not hasattr(app.state, "model_service") or app.state.model_service is None:
+        ms = ModelService()
+        if settings.MODEL_PATH.exists():
+            ms.load_artifacts(str(settings.MODEL_PATH))
+        app.state.model_service = ms
+
     port = get_free_port()
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
     server = uvicorn.Server(config)
@@ -57,3 +65,17 @@ def http_client(live_server_url):
     """Cliente HTTP real que se comunica por sockets con el servidor instanciado."""
     with httpx.Client(base_url=live_server_url, timeout=10.0) as client:
         yield client
+
+
+@pytest.fixture(autouse=True)
+def ensure_app_state_model_service():
+    """Garantiza que app.state.model_service esté inicializado y cargado en cada worker de prueba."""
+    from app.backend.services.model_service import ModelService
+    if not hasattr(app.state, "model_service") or app.state.model_service is None or not app.state.model_service.is_model_loaded():
+        ms = getattr(app.state, "model_service", None)
+        if ms is None:
+            ms = ModelService()
+            app.state.model_service = ms
+        if settings.MODEL_PATH.exists() and not ms.is_model_loaded():
+            ms.load_artifacts(str(settings.MODEL_PATH))
+

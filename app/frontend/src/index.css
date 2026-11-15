@@ -280,10 +280,30 @@ select { width: 100%; min-height: 44px; border: 1px solid #bfcfc8; border-radius
 .model-area-list li { padding: 13px 0; border-bottom: 1px solid #dce6df; font-size: 13px; }
 .model-area-score .model-score-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .model-score-heading strong { text-align: right; color: #244f47; font-size: 12px; white-space: nowrap; }
-.model-score-track { position: relative; height: 8px; margin-top: 9px; border-radius: 99px; background: #dfe8e3; }
-.model-score-track > span { display: block; height: 100%; border-radius: inherit; background: #438373; }
-.model-score-track.is-over-threshold > span { background: #b93832; }
-.model-score-track > i { position: absolute; top: -3px; width: 2px; height: 14px; background: #344e47; }
+.model-score-track { position: relative; height: 9px; margin-top: 9px; border-radius: 99px; background: #dfe8e3; overflow: hidden; }
+.model-score-track > span,
+.model-score-track .risk-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #438373;
+  transform-origin: left center !important;
+  animation: scoreBarGrowLeftToRight 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+.model-score-track.is-over-threshold > span,
+.model-score-track.is-over-threshold .risk-bar-fill,
+.model-score-track .risk-bar-fill.is-over-threshold {
+  background: #b93832 !important;
+}
+.model-score-track > i {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  background: #344e47;
+  z-index: 2;
+  transition: opacity 0.3s ease;
+}
 .model-area-score small { display: block; margin-top: 6px; color: #526765; font-size: 11px; }
 .model-factors { margin-top: 18px; }
 .model-factors h4 { margin: 0; font-size: 13px; color: #244f47; }
@@ -345,4 +365,344 @@ select { width: 100%; min-height: 44px; border: 1px solid #bfcfc8; border-radius
   .mobile-back { display: inline-flex; margin-bottom: 24px; }
   .lab-grid { grid-template-columns: minmax(0, 1fr); }
 }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+/* Pestañas de modo de evaluación en cabecera */
+.evaluation-mode-tabs {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f3;
+  border: 1px solid #cfded7;
+  border-radius: 6px;
+  padding: 3px;
+  gap: 3px;
+}
+.evaluation-mode-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #49635b;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  line-height: 1.2;
+}
+.evaluation-mode-tab:hover:not(:disabled) {
+  color: #17695e;
+  background: rgba(255, 255, 255, 0.7);
+}
+.evaluation-mode-tab.is-active {
+  background: #17695e;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.evaluation-mode-tab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.individual-select-wrapper {
+  display: inline-flex;
+  align-items: center;
+}
+.individual-select {
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #183b39;
+  background: #ffffff;
+  border: 1px solid #8fa9a0;
+  border-radius: 6px;
+  cursor: pointer;
+  max-width: 260px;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.individual-select:focus {
+  outline: 2px solid #17695e;
+  outline-offset: 1px;
+}
+
+/* Sección "Ver evolución" integrada en la columna de datos observados */
+.observed-evolution-wrapper {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #d8e2dd;
+}
+.evolution-panel {
+  background: #ffffff;
+  border: 1px solid #d6e2dc;
+  border-radius: 8px;
+  padding: 16px;
+}
+.evolution-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e7eee9;
+  margin-bottom: 14px;
+}
+.evolution-panel-header h4 {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: #183b39;
+}
+.evolution-nav-tabs {
+  display: inline-flex;
+  align-items: center;
+  background: #edf3f0;
+  border: 1px solid #cbdcd3;
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+.evolution-nav-tab {
+  border: none;
+  background: transparent;
+  color: #526765;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+.evolution-nav-tab:hover {
+  color: #17695e;
+}
+.evolution-nav-tab.is-active {
+  background: #ffffff;
+  color: #17695e;
+  font-weight: 650;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.evolution-parameter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.evolution-parameter-row label {
+  color: #526765;
+  font-size: 12px;
+  font-weight: 600;
+}
+.evolution-parameter-row select {
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid #9ab5aa;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #183b39;
+}
+.evolution-caption {
+  font-size: 12px;
+  color: #526765;
+  margin: 4px 0 10px;
+  line-height: 1.4;
+}
+.evolution-single-note {
+  font-size: 13px;
+  color: #526765;
+  background: #f7faf8;
+  padding: 12px;
+  border-radius: 6px;
+  margin: 10px 0 0;
+  border: 1px dashed #cedbd4;
+  line-height: 1.4;
+}
+.evolution-chart-container {
+  width: 100%;
+  margin-top: 8px;
+  min-height: 190px;
+}
+.labs-table-container {
+  overflow-x: auto;
+  margin-top: 10px;
+}
+.labs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+.labs-table th {
+  background: #f4f8f6;
+  color: #49685f;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-bottom: 1px solid #d8e2dd;
+  white-space: nowrap;
+}
+.labs-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e8f0ec;
+  color: #183b39;
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+.labs-table tr:hover {
+  background: #f9fbf9;
+}
+.labs-table tr.is-selected {
+  background: #edf5f1;
+}
+.labs-table tr.is-evaluating {
+  font-weight: 600;
+}
+.lab-filename {
+  display: block;
+  font-size: 11px;
+  color: #647b74;
+  font-weight: normal;
+}
+.badge-current {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #dbebe3;
+  color: #17695e;
+  border-radius: 4px;
+}
+.text-muted {
+  color: #7b918a;
+}
+.visit-detail-card {
+  margin-top: 14px;
+  padding: 12px;
+  background: #f8faf9;
+  border: 1px solid #dce6e1;
+  border-radius: 6px;
+}
+.visit-detail-card h5 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #183b39;
+}
+
+/* Animaciones sutiles y rápidas para recargas y cambios de pestaña */
+@keyframes pageSubtleFade {
+  0% {
+    opacity: 0.35;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scoreBarScale {
+  0% {
+    transform: scaleX(0);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes thresholdDrop {
+  0% {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+.workspace,
+.patient-result,
+.inbox-panel,
+.results-panel,
+.upload-panel,
+.evolution-chart-content,
+.evolution-labs-content {
+  animation: pageSubtleFade 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Estilos clínicos para valores diferenciales (deltas) */
+.delta-tag {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+.delta-adverse {
+  color: #c5221f !important; /* Rojo para deterioro clínico */
+}
+.delta-favorable {
+  color: #137333 !important; /* Verde para mejora o estabilidad */
+}
+.delta-neutral {
+  color: #526765;
+}
+.delta-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.delta-badge.delta-adverse {
+  color: #c5221f !important;
+  background: #fce8e6;
+}
+.delta-badge.delta-favorable {
+  color: #137333 !important;
+  background: #e6f4ea;
+}
+
+/* Animación garantizada de crecimiento de barras de riesgo de izquierda a derecha */
+@keyframes scoreBarGrowLeftToRight {
+  0% {
+    transform: scaleX(0);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+/* Animación de entrada muy visible y suave para comunicar actualización de información */
+@keyframes fadeInContent {
+  0% {
+    opacity: 0.05;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-content,
+.patient-result {
+  animation: fadeInContent 0.45s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}
+
+.evolution-chart-content,
+.evolution-labs-content {
+  animation: fadeInContent 0.35s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}

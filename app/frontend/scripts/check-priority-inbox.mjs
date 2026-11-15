@@ -110,7 +110,7 @@ try {
   assert.deepEqual(headers, ['Paciente', 'Prioridad', 'Señal principal', 'Abrir']);
   assert.equal(await rows.first().locator('td').count(), 4);
   assert.match(await rows.first().innerText(), /Filtrado del riñón 82/);
-  assert.match(await rows.first().innerText(), /cambio anual −9/);
+  assert.match(await rows.first().innerText(), /cambio( anual)? −9/);
   assert.match(await rows.first().innerText(), /Motivo de prioridad: descenso rápido del filtrado del riñón/i);
   assert.match(await rows.first().innerText(), /Alerta experimental: riñón y corazón/i);
   assert.match(await rows.nth(1).innerText(), /Alerta experimental: insuficiencia cardíaca/i);

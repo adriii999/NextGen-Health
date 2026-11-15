@@ -4,7 +4,6 @@ import { PatientResults } from '../components/folderView/PatientResults';
 import { PriorityInbox } from '../components/folderView/PriorityInbox';
 import { PatientQuickNav } from '../components/folderView/PatientQuickNav';
 import { IncompletePatientDetail } from '../components/folderView/IncompletePatientDetail';
-import { PatientEvolutionChart } from '../components/charts/PatientEvolutionChart';
 import { UploadPatientPage } from './UploadPatientPage';
 import { patientDisplayName } from '../services/patientDisplayName';
 
@@ -90,10 +89,19 @@ export function DashboardPage() {
     };
   }, [analyzedAt]);
 
+  const focusedPatientRef = useRef(null);
+
   useEffect(() => {
-    if (selected) detailHeading.current?.focus();
-    else if (!upload && lastOpened.current) {
-      document.getElementById(`review-${lastOpened.current}`)?.focus();
+    if (selected) {
+      if (focusedPatientRef.current !== selected.paciente_id) {
+        focusedPatientRef.current = selected.paciente_id;
+        detailHeading.current?.focus({ preventScroll: true });
+      }
+    } else {
+      focusedPatientRef.current = null;
+      if (!upload && lastOpened.current) {
+        document.getElementById(`review-${lastOpened.current}`)?.focus({ preventScroll: true });
+      }
     }
   }, [selected, upload]);
 
@@ -140,6 +148,33 @@ export function DashboardPage() {
     setSelected(patient);
   }
 
+  async function handleEvaluateMode({ paciente_id, modo, analitica_archivo }) {
+    setBusy('evaluate-mode');
+    setError('');
+    try {
+      const response = await analiticasService.evaluarSeguimientoOAnalitica({
+        paciente_id,
+        modo,
+        analitica_archivo,
+      });
+      if (response.success && response.paciente) {
+        const enriched = attachHistory(response.paciente, sources);
+        setSelected(enriched);
+        setPatients((prev) =>
+          prev.map((p) =>
+            (p.paciente_id === paciente_id || p.archivo === paciente_id)
+              ? { ...p, ...enriched }
+              : p
+          )
+        );
+      }
+    } catch (err) {
+      setError(analysisError(err));
+    } finally {
+      setBusy('');
+    }
+  }
+
   if (upload) return <>
     <div className="consultation-back"><button className="button secondary" onClick={() => setUpload(false)}>Volver al cupo</button></div>
     <UploadPatientPage />
@@ -161,15 +196,20 @@ export function DashboardPage() {
       <div className="patient-detail-layout">
         <PatientQuickNav patients={patients} selected={selected} onSelect={selectPatient} />
         <div className="patient-detail-content">
-          {selected.estado === 'EVALUADA' ? <>
+          {selected.estado === 'EVALUADA' ? (
             <section className="surface results-panel" aria-label="Resultado del paciente">
-              <PatientResults patient={selected} busy={busy} showHistory={false} showPatientHeading={false} />
+              <PatientResults
+                key={`${selected.id}-${selected.modo_evaluacion}-${selected.analitica_evaluada}`}
+                patient={selected}
+                busy={busy}
+                onEvaluateMode={handleEvaluateMode}
+                showHistory={false}
+                showPatientHeading={false}
+              />
             </section>
-            <details className="patient-history-disclosure">
-              <summary>Ver evolución · {selected.historial_visitas.length || 1} analíticas</summary>
-              <PatientEvolutionChart key={selected.id} patient={{ ...selected, nombre: patientDisplayName(selected) }} />
-            </details>
-          </> : <IncompletePatientDetail patient={selected} />}
+          ) : (
+            <IncompletePatientDetail patient={selected} />
+          )}
         </div>
       </div>
     </div>
