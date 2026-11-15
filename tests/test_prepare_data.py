@@ -14,6 +14,8 @@ EXPECTED_TARGETS = [
     "target_aterosclerotico",
     "target_insuficiencia_cardiaca",
     "target_cardiorrenal",
+    "target_microvascular",
+    "target_cardiometabolico",
 ]
 EXPECTED_COLUMNS = EXPECTED_FEATURES + EXPECTED_TARGETS
 

@@ -122,6 +122,8 @@ def test_api_batch_keeps_incomplete_records_without_predicting_them(http_client,
                     riesgo_aterosclerotico=safe,
                     riesgo_insuficiencia_cardiaca=safe,
                     riesgo_cardiorrenal=safe,
+                    riesgo_microvascular=safe,
+                    riesgo_cardiometabolico=safe,
                 ),
                 recomendacion_preventiva="Revisar contexto clínico.",
             )

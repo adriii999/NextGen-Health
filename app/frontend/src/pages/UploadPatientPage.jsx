@@ -163,9 +163,16 @@ export const UploadPatientPage = () => {
         </section>
       )}
 
-      {patient && <section className="surface results-panel upload-results" aria-label="Resultado del paciente">
-        <PatientResults patient={patient} busy={busy} onEvaluateMode={evaluate} />
-      </section>}
+      {patient && (
+        <section className="surface results-panel upload-results" aria-label="Resultado del paciente">
+          <PatientResults
+            key={`${patient.id}-${patient.modo_evaluacion}-${patient.analitica_evaluada}`}
+            patient={patient}
+            busy={busy}
+            onEvaluateMode={evaluate}
+          />
+        </section>
+      )}
     </div>
   );
 };

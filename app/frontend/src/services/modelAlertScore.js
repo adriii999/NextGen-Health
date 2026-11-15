@@ -1,7 +1,9 @@
 const modelAreas = [
-  ['riesgo_aterosclerotico', 'Circulación'],
-  ['riesgo_insuficiencia_cardiaca', 'Insuficiencia cardíaca'],
-  ['riesgo_cardiorrenal', 'Riñón y corazón'],
+  ['riesgo_aterosclerotico', 'Coronario e isquemia'],
+  ['riesgo_insuficiencia_cardiaca', 'Sobrecarga e insuficiencia cardíaca'],
+  ['riesgo_cardiorrenal', 'Función renal (Filtrado)'],
+  ['riesgo_microvascular', 'Daño microvascular y endotelial'],
+  ['riesgo_cardiometabolico', 'Descompensación cardiometabólica'],
 ];
 
 export function modelAlertScores(patient) {

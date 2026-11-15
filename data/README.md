@@ -73,13 +73,15 @@ python scripts/validate_dataset.py
 | `delta_colesterol` | Float | $\text{mg/dL/año}$ | $\approx 25\%$ | Variación interanual en perfil lipídico |
 | `delta_bmi` | Float | $\text{kg/m}^2/\text{año}$ | $\approx 25\%$ | Variación ponderal anual |
 
-### Targets Clínicos (Fenotipos Multi-Riesgo)
+### Targets Clínicos (5 Fenotipos Fisiopatológicos CKM / KDIGO)
 | Columna | Tipo | Valores | Significado Clínico y Guías |
 | :--- | :--- | :--- | :--- |
-| `target_cardio` | Entero | `0` / `1` | Presencia de evento o daño cardiovascular/cardiorrenal significativo |
-| `target_aterosclerotico` | Entero | `0` / `1` | Enfermedad vascular aterosclerótica (ASCVD) impulsada por dislipidemia, tabaquismo y PAS |
-| `target_insuficiencia_cardiaca` | Entero | `0` / `1` | Sobrecarga hemodinámica e insuficiencia cardíaca (HTA, IMC elevado, diabetes) |
-| `target_cardiorrenal` | Entero | `0` / `1` | Síndrome cardiorrenal según guías KDIGO 2024 (eGFR < 60, UACR $\ge 30$, progresores rápidos $\le -5$) |
+| `target_cardio` | Entero | `0` / `1` | Unión coherente de presencia de riesgo en cualquiera de los 5 ejes clínicos |
+| `target_aterosclerotico` | Entero | `0` / `1` | **Coronario e isquemia (ASCVD)** impulsado por perfil lipídico, tabaquismo, PAS, diabetes y edad |
+| `target_insuficiencia_cardiaca` | Entero | `0` / `1` | **Sobrecarga e insuficiencia cardíaca** impulsada por HTA, presión de pulso, IMC y edad |
+| `target_cardiorrenal` | Entero | `0` / `1` | **Función renal (Filtrado glomerular)** según KDIGO 2024 ($\text{eGFR}$ disminuido o caída rápida $\Delta_{\text{eGFR}} \le -5\text{ mL/min/año}$), protegido frente a falsos positivos si el filtrado es normal |
+| `target_microvascular` | Entero | `0` / `1` | **Daño microvascular y endotelial** impulsado por albuminuria ($\text{uACR}$), progresión $\Delta_{\text{uACR}}$, diabetes y rigidez arterial |
+| `target_cardiometabolico` | Entero | `0` / `1` | **Descompensación cardiometabólica** impulsada por exceso ponderal ($\text{IMC}$, $\Delta_{\text{IMC}}$), diabetes y dislipidemia progresiva |
 
 ---
 

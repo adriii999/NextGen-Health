@@ -32,11 +32,15 @@ TARGET_COLUMN = "target_cardio"
 TARGET_ATEROSCLEROTICO = "target_aterosclerotico"
 TARGET_INSUFICIENCIA_CARDIACA = "target_insuficiencia_cardiaca"
 TARGET_CARDIORRENAL = "target_cardiorrenal"
+TARGET_MICROVASCULAR = "target_microvascular"
+TARGET_CARDIOMETABOLICO = "target_cardiometabolico"
 ALL_COLUMNS = ORDERED_FEATURES + [
     TARGET_COLUMN,
     TARGET_ATEROSCLEROTICO,
     TARGET_INSUFICIENCIA_CARDIACA,
     TARGET_CARDIORRENAL,
+    TARGET_MICROVASCULAR,
+    TARGET_CARDIOMETABOLICO,
 ]
 
 
@@ -402,65 +406,129 @@ def synthesize_cardiorenal_and_deltas(base_df: pd.DataFrame, random_seed: int = 
     df.loc[mask_missing, delta_cols] = np.nan
 
     # --------------------------------------------------------------------------
-    # 5. ESTRATIFICACIÓN FENOTÍPICA CON RESPETO AL GROUND TRUTH CLÍNICO REAL
+    # 5. ESTRATIFICACIÓN FENOTÍPICA EN 5 DOMINIOS CKM (AHA / ESC / KDIGO 2024)
     # --------------------------------------------------------------------------
-    # A) Fenotipo Aterosclerótico (ASCVD / Placa / Isquemia - SCORE2 / ESC):
+    d_egfr = df["delta_egfr"].fillna(0.0).to_numpy()
+    d_uacr = df["delta_uacr"].fillna(0.0).to_numpy()
+    d_ap = df["delta_ap_hi"].fillna(0.0).to_numpy()
+    d_col = df["delta_colesterol"].fillna(0.0).to_numpy()
+    d_bmi = df["delta_bmi"].fillna(0.0).to_numpy()
+    pulse_pressure = df["ap_hi"].to_numpy() - df["ap_lo"].to_numpy()
+
+    # A) Fenotipo 1: Coronario e Isquemia (Aterosclerosis / Placa - SCORE2 / ESC):
+    # Impulsado por colesterol total, aumento de colesterol, tabaquismo, PAS, diabetes y edad
     logit_ath = (
-        -3.65
-        + 0.042 * (df["edad"] - 50.0)
-        + 0.026 * (df["ap_hi"] - 120.0)
-        + 0.015 * (df["colesterol_total"] - 190.0)
-        + 0.72 * df["fuma"]
-        + 0.62 * df["diabetes"]
-        + 0.028 * df["delta_ap_hi"].fillna(0.0)
-        + 0.018 * df["delta_colesterol"].fillna(0.0)
-        + 0.45 * orig_cardio
+        -3.85
+        + 0.042 * (df["edad"].to_numpy() - 52.0)
+        + 0.028 * (df["ap_hi"].to_numpy() - 125.0)
+        + 0.032 * (df["colesterol_total"].to_numpy() - 190.0)
+        + 1.15 * df["fuma"].to_numpy()
+        + 0.58 * df["diabetes"].to_numpy()
+        + 0.035 * np.maximum(0.0, d_ap - 3.0)
+        + 0.055 * np.maximum(0.0, d_col - 3.0)
+        + 0.50 * orig_cardio
     )
     p_ath = 1.0 / (1.0 + np.exp(-logit_ath))
     y_ath = (rng.random(n) < p_ath).astype(int)
-    # Respetar diagnósticos reales de ASCVD en NHANES (MCQ160C/D/E)
+    # Protección si no hay carga aterogénica
+    ath_safe = (
+        (df["colesterol_total"].to_numpy() < 188.0)
+        & (d_col < 6.0)
+        & (df["fuma"].to_numpy() == 0)
+        & (df["ap_hi"].to_numpy() < 130.0)
+        & (real_ascvd != 1)
+    )
+    y_ath = np.where(ath_safe, 0, y_ath)
     y_ath = np.where(real_ascvd == 1, 1, y_ath)
     df["target_aterosclerotico"] = y_ath
 
-    # B) Fenotipo Insuficiencia Cardíaca (Sobrecarga hemodinámica / PREVENT-HF):
+    # B) Fenotipo 2: Sobrecarga e Insuficiencia Cardíaca (Hemodinámica / PREVENT-HF):
+    # Impulsado por HTA sistólica/diastólica, presión de pulso, progresión tensional, IMC y edad
     logit_hf = (
-        -3.75
-        + 0.038 * (df["edad"] - 50.0)
-        + 0.028 * (df["ap_hi"] - 120.0)
-        + 0.070 * (df["bmi"] - 25.0)
-        + 0.68 * df["diabetes"]
-        - 0.024 * (df["egfr"] - 75.0)
-        + 0.038 * df["delta_ap_hi"].fillna(0.0)
-        + 0.14 * df["delta_bmi"].fillna(0.0)
+        -3.95
+        + 0.044 * (df["edad"].to_numpy() - 54.0)
+        + 0.055 * (df["ap_hi"].to_numpy() - 128.0)
+        + 0.032 * np.maximum(0.0, pulse_pressure - 48.0)
+        + 0.085 * (df["bmi"].to_numpy() - 26.0)
+        + 0.085 * np.maximum(0.0, d_ap - 3.0)
+        + 0.22 * np.maximum(0.0, d_bmi - 0.3)
+        - 0.025 * np.minimum(0.0, df["egfr"].to_numpy() - 65.0)
         + 0.45 * orig_cardio
     )
     p_hf = 1.0 / (1.0 + np.exp(-logit_hf))
     y_hf = (rng.random(n) < p_hf).astype(int)
-    # Respetar diagnósticos reales de Insuficiencia Cardíaca en NHANES (MCQ160B)
+    hf_safe = (
+        (df["ap_hi"].to_numpy() < 128.0)
+        & (d_ap < 5.0)
+        & (df["bmi"].to_numpy() < 26.5)
+        & (df["egfr"].to_numpy() >= 75.0)
+        & (real_hf != 1)
+    )
+    y_hf = np.where(hf_safe, 0, y_hf)
     y_hf = np.where(real_hf == 1, 1, y_hf)
     df["target_insuficiencia_cardiaca"] = y_hf
 
-    # C) Fenotipo Cardiorrenal (KDIGO 2024 / Deterioro silente / Albuminuria):
+    # C) Fenotipo 3: Función Renal / Filtrado Glomerular (KDIGO 2024 Nefropatía Parenquimatosa):
+    # Específico de pérdida de filtrado (eGFR reducido o caída rápida delta_egfr <= -5).
+    # NO sobrediagnostica cuando el filtrado es normal (>= 80 mL/min) y estable.
     logit_cr = (
-        -3.15
-        - 0.044 * (df["egfr"] - 75.0)
-        + 0.022 * np.minimum(df["uacr"], 250.0) - 0.44
-        - 0.22 * df["delta_egfr"].fillna(0.0)
-        + 0.035 * df["delta_uacr"].fillna(0.0)
-        + 0.72 * df["diabetes"]
-        + 0.016 * (df["ap_hi"] - 120.0)
-        + 0.30 * orig_cardio
+        -3.95
+        + 0.105 * np.maximum(0.0, 75.0 - df["egfr"].to_numpy())
+        - 0.44 * np.minimum(0.0, d_egfr + 2.5)
+        + 0.012 * np.maximum(0.0, np.minimum(df["uacr"].to_numpy(), 250.0) - 35.0)
+        + 0.35 * df["diabetes"].to_numpy() * (df["egfr"].to_numpy() < 78.0).astype(float)
     )
     p_cr = 1.0 / (1.0 + np.exp(-logit_cr))
     y_cr = (rng.random(n) < p_cr).astype(int)
-    # En NHANES, daño renal KDIGO de alto riesgo real (G3b-G5 o macroalbuminuria A3) es positivo real
-    is_nhanes = ~np.isnan(real_ascvd)
-    real_severe_ckd = is_nhanes & ((df["egfr"] < 45.0) | (df["uacr"] >= 200.0))
-    y_cr = np.where(real_severe_ckd, 1, y_cr)
+    renal_safe = (df["egfr"].to_numpy() >= 84.0) & (d_egfr > -3.5) & (df["uacr"].to_numpy() < 60.0)
+    y_cr = np.where(renal_safe, 0, y_cr)
+    # Casos francos de deterioro renal o caída rápida siempre positivos
+    renal_frank = (df["egfr"].to_numpy() < 58.0) | (d_egfr <= -5.0)
+    y_cr = np.where(renal_frank, 1, y_cr)
     df["target_cardiorrenal"] = y_cr
 
-    # D) Target cardio global compuesto:
-    df["target_cardio"] = np.maximum(y_ath, np.maximum(y_hf, y_cr))
+    # D) Fenotipo 4: Daño Microvascular y Endotelial (Albuminuria / Permeabilidad Capilar):
+    # Impulsado por uACR, incremento progresivo de uACR (delta_uacr), diabetes, tabaco y presión de pulso
+    logit_micro = (
+        -3.80
+        + 0.068 * (np.minimum(df["uacr"].to_numpy(), 250.0) - 18.0)
+        + 0.125 * np.maximum(0.0, d_uacr - 4.0)
+        + 0.85 * df["diabetes"].to_numpy()
+        + 0.45 * df["fuma"].to_numpy()
+        + 0.022 * np.maximum(0.0, pulse_pressure - 46.0)
+    )
+    p_micro = 1.0 / (1.0 + np.exp(-logit_micro))
+    y_micro = (rng.random(n) < p_micro).astype(int)
+    micro_safe = (df["uacr"].to_numpy() < 15.0) & (d_uacr < 5.0) & (df["diabetes"].to_numpy() == 0)
+    y_micro = np.where(micro_safe, 0, y_micro)
+    micro_frank = (df["uacr"].to_numpy() >= 32.0) | (d_uacr >= 14.0)
+    y_micro = np.where(micro_frank, 1, y_micro)
+    df["target_microvascular"] = y_micro
+
+    # E) Fenotipo 5: Descompensación Cardiometabólica (Eje Adiposo-Lipídico-Glucémico CKM):
+    # Impulsado por IMC, ganancia ponderal (delta_bmi), diabetes, colesterol y progresión lipídica (delta_colesterol)
+    logit_metab = (
+        -3.85
+        + 0.145 * (df["bmi"].to_numpy() - 26.0)
+        + 0.55 * np.maximum(0.0, d_bmi - 0.3)
+        + 1.35 * df["diabetes"].to_numpy()
+        + 0.026 * (df["colesterol_total"].to_numpy() - 185.0)
+        + 0.055 * np.maximum(0.0, d_col - 3.0)
+    )
+    p_metab = 1.0 / (1.0 + np.exp(-logit_metab))
+    y_metab = (rng.random(n) < p_metab).astype(int)
+    metab_safe = (
+        (df["bmi"].to_numpy() < 25.2)
+        & (df["diabetes"].to_numpy() == 0)
+        & (df["colesterol_total"].to_numpy() < 190.0)
+        & (d_col < 6.0)
+        & (d_bmi < 0.5)
+    )
+    y_metab = np.where(metab_safe, 0, y_metab)
+    df["target_cardiometabolico"] = y_metab
+
+    # F) Target cardio global compuesto:
+    df["target_cardio"] = np.maximum.reduce([y_ath, y_hf, y_cr, y_micro, y_metab])
 
     output_cols = ALL_COLUMNS + (["source_weight"] if "source_weight" in df.columns else [])
     return df[output_cols]

@@ -1,15 +1,15 @@
 {
   "paciente_id": "paciente_02_trampa_rango_normal_deterioro_silente",
-  "nombre": "Seguimiento 02 · Deterioro Silente (Trampa del Rango Normal)",
+  "nombre": "Seguimiento 02 · Deterioro Renal Silente (Rango Normal)",
   "fecha_analitica": "2025-03-10",
-  "edad": 55.0,
+  "edad": 54.0,
   "sexo": 1,
-  "bmi": 25.7,
-  "ap_hi": 120.0,
-  "ap_lo": 78.0,
-  "colesterol_total": 189.0,
+  "bmi": 23.8,
+  "ap_hi": 118.0,
+  "ap_lo": 76.0,
+  "colesterol_total": 174.0,
   "fuma": 0,
-  "diabetes": 1,
+  "diabetes": 0,
   "egfr": 91.0,
   "uacr": 6.0
 }

@@ -63,6 +63,8 @@ def test_api_predict_modo_a_control_sano(http_client: httpx.Client):
     assert tipos["riesgo_aterosclerotico"]["alerta"] is False
     assert tipos["riesgo_insuficiencia_cardiaca"]["alerta"] is False
     assert tipos["riesgo_cardiorrenal"]["alerta"] is False
+    assert tipos["riesgo_microvascular"]["alerta"] is False
+    assert tipos["riesgo_cardiometabolico"]["alerta"] is False
     # Incluso en control sano debe ejecutar SHAP y devolver factores clave (protectores/basales)
     assert len(data["factores_clave"]) > 0
 
@@ -335,4 +337,21 @@ def test_api_analiticas_carpetas_pacientes_modo_a_y_modo_b(http_client: httpx.Cl
     assert item_b["evaluacion"]["hay_riesgo"] is True
     assert item_b["evaluacion"]["nivel_prioridad"] == "ALTA"
     assert item_b["evaluacion"]["perfil_renal"]["progresor_rapido"] is True
+
+    # 3. Verificar que las analíticas de ejemplo cumplan la regla de "aparentemente correctas"
+    # (colesterol total < 200 mg/dL en los ejemplos y variedad de motivos sin sobrediagnosticar caída renal en todos)
+    res_batch = http_client.post("/api/analiticas/analizar-carpeta")
+    assert res_batch.status_code == 200
+    batch_items = res_batch.json()
+    assert len(batch_items) >= 6
+    for item in batch_items:
+        col_val = item["datos_entrada"].get("colesterol_total")
+        if col_val is not None:
+            assert col_val < 200.0, f"El ejemplo {item['archivo']} supera 200 mg/dL de colesterol ({col_val})"
+    rapid_decliners = [
+        item for item in batch_items
+        if item.get("evaluacion") and item["evaluacion"]["perfil_renal"]["progresor_rapido"]
+    ]
+    assert 1 <= len(rapid_decliners) <= 2, "No todos los ejemplos deben disparar alerta de descenso rápido renal"
+
 

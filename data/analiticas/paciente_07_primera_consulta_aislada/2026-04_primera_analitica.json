@@ -1,0 +1,15 @@
+{
+  "paciente_id": "paciente_07_primera_consulta_aislada",
+  "nombre": "Seguimiento 07 · Primera Consulta Aislada (Sin Historial)",
+  "fecha_analitica": "2026-04-22",
+  "edad": 61.0,
+  "sexo": 2,
+  "bmi": 27.4,
+  "ap_hi": 136.0,
+  "ap_lo": 84.0,
+  "colesterol_total": 192.0,
+  "fuma": 1,
+  "diabetes": 1,
+  "egfr": 86.0,
+  "uacr": 12.0
+}

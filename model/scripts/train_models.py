@@ -17,7 +17,7 @@ ARTIFACT_PATH = ROOT_DIR / "model" / "out" / "model_artifact.joblib"
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
 CV_FOLDS = 5
-TARGET_RECALL = 0.85
+TARGET_RECALL = 0.80
 
 FEATURE_COLUMNS = [
     "edad", "sexo", "bmi", "ap_hi", "ap_lo", "colesterol_total", "fuma",
@@ -32,11 +32,13 @@ FEATURE_COLUMNS = [
 # delta_colesterol(+1), delta_bmi(+1)
 MONOTONE_CONSTRAINTS = (1, 0, 1, 1, 0, 1, 1, 1, -1, 1, -1, 1, 1, 1, 1)
 
-# Fenotipos clínicos de riesgo cardiovascular y cardiorrenal multidimensional
+# 5 Fenotipos clínicos de riesgo cardiovascular, renal, microvascular y cardiometabólico (CKM / KDIGO)
 TARGET_COLUMNS = {
     "riesgo_aterosclerotico": "target_aterosclerotico",
     "riesgo_insuficiencia_cardiaca": "target_insuficiencia_cardiaca",
     "riesgo_cardiorrenal": "target_cardiorrenal",
+    "riesgo_microvascular": "target_microvascular",
+    "riesgo_cardiometabolico": "target_cardiometabolico",
 }
 
 
@@ -115,9 +117,9 @@ def _threshold_for_recall(y_true: np.ndarray, probabilities: np.ndarray) -> floa
     precision, recall, thresholds = precision_recall_curve(y_true, probabilities)
     qualifying = np.flatnonzero(recall[:-1] >= TARGET_RECALL)
     if len(qualifying) == 0:
-        return 0.10
+        return 0.25
     best = qualifying[np.argmax(precision[:-1][qualifying])]
-    return float(thresholds[best])
+    return float(np.clip(thresholds[best], 0.22, 0.45))
 
 
 def _evaluate_target(

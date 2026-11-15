@@ -1,0 +1,15 @@
+{
+  "paciente_id": "paciente_06_sindrome_ckm_multiorganico",
+  "nombre": "Seguimiento 06 · Síndrome Cardiometabólico y Vascular Progresivo",
+  "fecha_analitica": "2026-06-15",
+  "edad": 60.0,
+  "sexo": 2,
+  "bmi": 28.0,
+  "ap_hi": 138.0,
+  "ap_lo": 84.0,
+  "colesterol_total": 194.0,
+  "fuma": 1,
+  "diabetes": 1,
+  "egfr": 72.2,
+  "uacr": 27.5
+}

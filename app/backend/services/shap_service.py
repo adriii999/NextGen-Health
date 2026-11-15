@@ -6,9 +6,11 @@ from app.backend.schemas.response import FactorClave
 
 
 PHENOTYPE_LABELS = {
-    "riesgo_aterosclerotico": "Eje Aterosclerótico",
-    "riesgo_insuficiencia_cardiaca": "Eje Insuficiencia Cardíaca",
-    "riesgo_cardiorrenal": "Eje Cardiorrenal",
+    "riesgo_aterosclerotico": "Coronario e Isquemia",
+    "riesgo_insuficiencia_cardiaca": "Sobrecarga e Insuficiencia Cardíaca",
+    "riesgo_cardiorrenal": "Función Renal (Filtrado)",
+    "riesgo_microvascular": "Daño Microvascular y Endotelial",
+    "riesgo_cardiometabolico": "Descompensación Cardiometabólica",
 }
 
 
@@ -337,16 +339,17 @@ class ShapService:
     def _format_value(self, var: str, val: Any) -> str:
         if val is None or (isinstance(val, float) and np.isnan(val)):
             return "No disponible"
+        sign = "+" if var.startswith("delta_") and float(val) > 0 else ""
         if var in ["colesterol_total", "delta_colesterol"]:
-            return f"{float(val):.0f} mg/dL"
+            return f"{sign}{float(val):.0f} mg/dL"
         if var in ["egfr", "delta_egfr"]:
-            return f"{float(val):.1f} mL/min"
+            return f"{sign}{float(val):.1f} mL/min"
         if var in ["uacr", "delta_uacr"]:
-            return f"{float(val):.1f} mg/g"
+            return f"{sign}{float(val):.1f} mg/g"
         if var in ["ap_hi", "ap_lo", "delta_ap_hi"]:
-            return f"{float(val):.0f} mmHg"
+            return f"{sign}{float(val):.0f} mmHg"
         if var in ["bmi", "delta_bmi"]:
-            return f"{float(val):.1f} kg/m²"
+            return f"{sign}{float(val):.1f} kg/m²"
         if var == "edad":
             return f"{float(val):.0f} años"
         if var == "diabetes":

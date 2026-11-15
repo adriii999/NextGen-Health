@@ -26,7 +26,7 @@ function observedSummary(patient) {
   const riskLabels = { BAJO: 'bajo', MODERADO: 'moderado', ALTO: 'alto', MUY_ALTO: 'muy alto' };
   const values = [
     Number.isFinite(egfr.actual) ? `Filtrado del riñón ${number(egfr.actual)} ${egfr.unidad}` : 'Filtrado del riñón sin dato',
-    Number.isFinite(egfr.delta) ? `cambio anual ${egfr.delta > 0 ? '+' : '−'}${number(Math.abs(egfr.delta))}` : null,
+    Number.isFinite(egfr.delta) ? `cambio ${egfr.delta > 0 ? '+' : '−'}${number(Math.abs(egfr.delta))}` : null,
     Number.isFinite(uacr.actual) ? `Albúmina en orina ${number(uacr.actual)} ${uacr.unidad}` : 'Albúmina en orina sin dato',
   ].filter(Boolean);
   const classification = renal

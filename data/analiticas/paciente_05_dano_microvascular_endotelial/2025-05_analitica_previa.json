@@ -1,0 +1,15 @@
+{
+  "paciente_id": "paciente_05_dano_microvascular_endotelial",
+  "nombre": "Seguimiento 05 · Daño Microvascular Incipiente (Filtrado Normal)",
+  "fecha_analitica": "2025-05-18",
+  "edad": 51.0,
+  "sexo": 1,
+  "bmi": 23.6,
+  "ap_hi": 118.0,
+  "ap_lo": 75.0,
+  "colesterol_total": 168.0,
+  "fuma": 0,
+  "diabetes": 1,
+  "egfr": 96.0,
+  "uacr": 7.0
+}
