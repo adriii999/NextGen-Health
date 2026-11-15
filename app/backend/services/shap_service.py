@@ -6,9 +6,11 @@ from app.backend.schemas.response import FactorClave
 
 
 PHENOTYPE_LABELS = {
-    "riesgo_aterosclerotico": "Eje Aterosclerótico",
-    "riesgo_insuficiencia_cardiaca": "Eje Insuficiencia Cardíaca",
-    "riesgo_cardiorrenal": "Eje Cardiorrenal",
+    "riesgo_aterosclerotico": "Coronario e Isquemia",
+    "riesgo_insuficiencia_cardiaca": "Sobrecarga e Insuficiencia Cardíaca",
+    "riesgo_cardiorrenal": "Función Renal (Filtrado)",
+    "riesgo_microvascular": "Daño Microvascular y Endotelial",
+    "riesgo_cardiometabolico": "Descompensación Cardiometabólica",
 }
 
 

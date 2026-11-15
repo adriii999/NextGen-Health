@@ -2,14 +2,14 @@
   "paciente_id": "paciente_01_seguimiento_control_sano",
   "nombre": "Seguimiento 01 · Control Sano Estable",
   "fecha_analitica": "2026-02-14",
-  "edad": 53.0,
+  "edad": 49.0,
   "sexo": 1,
-  "bmi": 24.5,
-  "ap_hi": 122.0,
-  "ap_lo": 78.0,
-  "colesterol_total": 182.0,
+  "bmi": 22.9,
+  "ap_hi": 118.0,
+  "ap_lo": 75.0,
+  "colesterol_total": 171.0,
   "fuma": 0,
   "diabetes": 0,
-  "egfr": 94.0,
-  "uacr": 9.0
+  "egfr": 97.8,
+  "uacr": 6.5
 }

@@ -109,7 +109,9 @@ def test_model_service_uses_independent_models_and_thresholds():
     model_probabilities = {
         "riesgo_aterosclerotico": 0.73,
         "riesgo_insuficiencia_cardiaca": 0.21,
-        "riesgo_cardiorrenal": 0.11,
+        "riesgo_cardiorrenal": 0.42,
+        "riesgo_microvascular": 0.35,
+        "riesgo_cardiometabolico": 0.14,
     }
     service.models = {}
     service.explainers = {}
@@ -123,7 +125,9 @@ def test_model_service_uses_independent_models_and_thresholds():
     service.thresholds = {
         "riesgo_aterosclerotico": 0.5,
         "riesgo_insuficiencia_cardiaca": 0.25,
-        "riesgo_cardiorrenal": 0.1,
+        "riesgo_cardiorrenal": 0.3,
+        "riesgo_microvascular": 0.3,
+        "riesgo_cardiometabolico": 0.3,
     }
     service.artifact_loaded = True
 
@@ -135,12 +139,16 @@ def test_model_service_uses_independent_models_and_thresholds():
 
     assert result.tipos_riesgo.riesgo_aterosclerotico.valor == 0.73
     assert result.tipos_riesgo.riesgo_insuficiencia_cardiaca.valor == 0.21
-    assert result.tipos_riesgo.riesgo_cardiorrenal.valor == 0.11
+    assert result.tipos_riesgo.riesgo_cardiorrenal.valor == 0.42
+    assert result.tipos_riesgo.riesgo_microvascular.valor == 0.35
+    assert result.tipos_riesgo.riesgo_cardiometabolico.valor == 0.14
     assert result.tipos_riesgo.riesgo_aterosclerotico.alerta is True
     assert result.tipos_riesgo.riesgo_insuficiencia_cardiaca.alerta is False
     assert result.tipos_riesgo.riesgo_cardiorrenal.alerta is True
+    assert result.tipos_riesgo.riesgo_microvascular.alerta is True
+    assert result.tipos_riesgo.riesgo_cardiometabolico.alerta is False
     assert set(result.motivos_prioridad) == {
-        "ALERTA_CIRCULACION", "ALERTA_RINON_CORAZON", "PUNTUACION_ALTA"
+        "ALERTA_CIRCULACION", "ALERTA_RINON_CORAZON", "ALERTA_MICROVASCULAR", "PUNTUACION_ALTA", "MULTIPLES_ALERTAS"
     }
     assert all(model.predict_proba.called for model in service.models.values())
     assert result.factores_clave
@@ -150,16 +158,17 @@ def test_priority_reasons_reflect_actual_triggers():
     service = ModelService()
     renal = service._compute_kdigo_profile({"egfr": 50, "uacr": 100})
     reasons = service._priority_reasons(
-        True, True, True,
+        True, True, True, True, True,
         {"ap_hi": 170, "ap_lo": 80, "delta_egfr": -6},
         {"a": 0.5}, renal,
     )
     assert set(reasons) == {
         "ALERTA_CIRCULACION", "ALERTA_CORAZON", "ALERTA_RINON_CORAZON",
+        "ALERTA_MICROVASCULAR", "ALERTA_CARDIOMETABOLICO",
         "DESCENSO_RAPIDO", "RIESGO_RENAL_ALTO", "PRESION_ALTA",
-        "PUNTUACION_ALTA", "TRES_ALERTAS",
+        "PUNTUACION_ALTA", "TRES_ALERTAS", "MULTIPLES_ALERTAS",
     }
-    assert service._priority_reasons(False, False, False, {}, {}, renal) == [
+    assert service._priority_reasons(False, False, False, False, False, {}, {}, renal) == [
         "SIN_ALERTAS", "RIESGO_RENAL_ALTO"
     ]
 
@@ -227,6 +236,8 @@ def test_model_service_executes_shap_even_when_low_risk_and_describes_protective
         "riesgo_aterosclerotico": 0.25,
         "riesgo_insuficiencia_cardiaca": 0.25,
         "riesgo_cardiorrenal": 0.25,
+        "riesgo_microvascular": 0.25,
+        "riesgo_cardiometabolico": 0.25,
     }
     service.artifact_loaded = True
 

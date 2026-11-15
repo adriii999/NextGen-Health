@@ -1,15 +1,18 @@
 const criteria = {
   DESCENSO_RAPIDO: 'descenso rápido del filtrado del riñón',
-  RIESGO_RENAL_ALTO: 'clasificación renal alta',
+  RIESGO_RENAL_ALTO: 'clasificación renal de alto riesgo',
   PRESION_ALTA: 'presión arterial elevada',
   PUNTUACION_ALTA: 'puntuación elevada del modelo experimental',
-  TRES_ALERTAS: 'alertas en las tres evaluaciones del modelo',
+  MULTIPLES_ALERTAS: 'afectación simultánea en tres o más ejes clínicos',
+  TRES_ALERTAS: 'alertas en múltiples ejes principales',
 };
 
 const alerts = {
-  ALERTA_CIRCULACION: 'circulación',
-  ALERTA_CORAZON: 'insuficiencia cardíaca',
-  ALERTA_RINON_CORAZON: 'riñón y corazón',
+  ALERTA_CIRCULACION: 'coronario e isquemia',
+  ALERTA_CORAZON: 'sobrecarga e insuficiencia cardíaca',
+  ALERTA_RINON_CORAZON: 'función renal (filtrado)',
+  ALERTA_MICROVASCULAR: 'daño microvascular y endotelial',
+  ALERTA_CARDIOMETABOLICO: 'descompensación cardiometabólica',
 };
 
 export function priorityExplanation(patient) {

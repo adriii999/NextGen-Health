@@ -84,21 +84,27 @@ Antes de estos cambios, el modelo sufría de varios problemas técnicos y médic
 
 ---
 
-## 3. Métricas Finales de los Modelos Entrenados
+## 3. Rediseño a 5 Ejes Clínicos CKM / KDIGO y Corrección del Sobrediagnóstico Renal
 
-Los tres modelos XGBoost integrados en `model/out/model_artifact.joblib` presentan las siguientes métricas de rendimiento clínico:
+Para ofrecer una evaluación clínica verdaderamente útil en Atención Primaria y evitar la redundancia de categorías solapadas ("Circulación", "Insuficiencia cardíaca" y otra vez "Riñón y corazón"), se reestructuró la salida del modelo siguiendo el marco médico **AHA CKM (Cardiovascular-Kidney-Metabolic Syndrome)**, **ESC/SEC** y **KDIGO 2024** en **5 dominios fisiopatológicos independientes**:
 
-| Fenotipo Clínico | ROC-AUC | PR-AUC | Brier Score (Calibración) | Sensibilidad (Recall) | Umbral Operativo Calibrado |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Riesgo Aterosclerótico (ASCVD)** | `0.817` | `0.435` | `0.0848` | `85.1%` | **7.0%** (`0.070`) |
-| **Riesgo Insuficiencia Cardíaca** | `0.838` | `0.495` | `0.0848` | `85.7%` | **8.0%** (`0.080`) |
-| **Riesgo Cardiorrenal (KDIGO)** | `0.910` | `0.824` | `0.0966` | `85.2%` | **23.6%** (`0.236`) |
+| Clave API (`TiposRiesgo`) | Etiqueta Clínica en Interfaz | Mecanismo Fisiopatológico Evaluado | ROC-AUC | PR-AUC | Brier Score | Umbral Operativo |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: |
+| `riesgo_aterosclerotico` | **Coronario e isquemia** | Placa ateromatosa, infarto e ictus (colesterol, $\Delta$ colesterol, tabaco, PAS, edad) | `0.906` | `0.646` | `0.0764` | **22/100** (`0.220`) |
+| `riesgo_insuficiencia_cardiaca` | **Sobrecarga e insuficiencia cardíaca** | Sobrecarga hemodinámica y fallo de bomba (PAS, presión de pulso, $\Delta$ PAS, IMC, edad) | `0.909` | `0.642` | `0.0654` | **22/100** (`0.220`) |
+| `riesgo_cardiorrenal` | **Función renal (Filtrado)** | Pérdida nefronal y caída del filtrado glomerular ($\text{eGFR}$ y $\Delta_{\text{eGFR}}$) | `0.986` | `0.985` | `0.0207` | **45/100** (`0.450`) |
+| `riesgo_microvascular` | **Daño microvascular y endotelial** | Permeabilidad capilar y daño glomerular ($\text{uACR}$, $\Delta_{\text{uACR}}$, diabetes, tabaco) | `0.995` | `0.992` | `0.0103` | **45/100** (`0.450`) |
+| `riesgo_cardiometabolico` | **Descompensación cardiometabólica** | Eje metabólico-adiposo-lipídico ($\text{IMC}$, $\Delta_{\text{IMC}}$, diabetes, colesterol) | `0.906` | `0.636` | `0.0707` | **22/100** (`0.220`) |
+
+### ¿Por qué antes salían alertas de riñón en casi todos los casos y cómo se corrigió?
+1. **En el modelo (`prepare_data.py` y `train_models.py`):** Anteriormente, `target_cardiorrenal` tenía una prevalencia basal del 60.5% porque mezclaba edad, hipertensión general, albuminuria y caída de filtrado en una sola etiqueta ruidosa. Al separar **Función renal (Filtrado)** (`riesgo_cardiorrenal`) de **Daño microvascular y endotelial** (`riesgo_microvascular`) e imponer una regla de protección fisiológica ($\text{eGFR} \ge 84\text{ mL/min}$ con $\Delta_{\text{eGFR}} > -3.5$ no activa fallo de filtrado), el modelo solo alerta de función renal cuando existe afectación real del filtrado glomerular.
+2. **En las analíticas de ejemplo (`data/analiticas/`):** Anteriormente, 4 de las 6 carpetas de ejemplo tenían caídas de filtrado extremas ($\Delta_{\text{eGFR}} \le -8\text{ mL/min/año}$) y colesteroles francamente patológicos ($> 250\text{ mg/dL}$), incumpliendo la regla de *"analíticas aparentemente correctas"*. Se han regenerado **7 carpetas de seguimiento** donde todos los pacientes mantienen colesterol total $< 200\text{ mg/dL}$ ($162 - 196\text{ mg/dL}$), $\text{eGFR} > 60\text{ mL/min}$ y $\text{uACR} < 30\text{ mg/g}$ en corte estático, cubriendo cada uno de los 5 fenotipos sin sobrediagnosticar caída renal.
 
 ---
 
 ## 4. Estado de Validación y Tests
 
 El proyecto cuenta con verificación continua bajo Test-Driven Development (TDD):
-* **Backend y Machine Learning (`pytest -n auto`):** **43 pruebas superadas (100% PASSED)** en `tests/`.
-* **Frontend React / Vite (`npm test`):** **4 pruebas unitarias superadas (100% PASSED)** en `app/frontend/`.
-* **Prueba en las 6 carpetas de pacientes reales:** Verificado el comportamiento de los modos A y B, incluyendo el caso emblemático de la *"Trampa del Rango Normal"* (paciente con valores aparentemente normales pero pérdida acelerada de filtrado glomerular, detectado con riesgo cardiorrenal del 49% y prioridad ALTA).
+* **Backend y Machine Learning (`pytest -n auto`):** **67 pruebas superadas (100% PASSED)** en `tests/`.
+* **Frontend React / Vite (`npm test`):** **12 pruebas unitarias superadas (100% PASSED)** en `app/frontend/`.
+* **Prueba en las 7 carpetas de seguimiento en `data/analiticas/`:** Verificada la cobertura completa de prioridades (`BAJA`, `MEDIA`, `ALTA`), modos (`Seguimiento` y `Analíticas individuales`) y los 5 ejes clínicos CKM/KDIGO.

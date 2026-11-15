@@ -1,15 +1,15 @@
 {
   "paciente_id": "paciente_03_alto_riesgo_franco",
-  "nombre": "Seguimiento 03 · Alto Riesgo Aterosclerótico y Cardiorrenal",
+  "nombre": "Seguimiento 03 · Riesgo Coronario y Metabólico (Riñón Estable)",
   "fecha_analitica": "2025-01-20",
-  "edad": 64.0,
+  "edad": 57.0,
   "sexo": 2,
-  "bmi": 31.2,
-  "ap_hi": 155.0,
-  "ap_lo": 94.0,
-  "colesterol_total": 248.0,
+  "bmi": 26.4,
+  "ap_hi": 125.0,
+  "ap_lo": 79.0,
+  "colesterol_total": 178.0,
   "fuma": 1,
   "diabetes": 1,
-  "egfr": 58.0,
-  "uacr": 65.0
+  "egfr": 93.2,
+  "uacr": 7.5
 }

@@ -1,0 +1,15 @@
+{
+  "paciente_id": "paciente_04_sobrecarga_hemodinamica",
+  "nombre": "Seguimiento 04 · Sobrecarga Hemodinámica e Insuficiencia Cardíaca",
+  "fecha_analitica": "2025-04-12",
+  "edad": 64.0,
+  "sexo": 1,
+  "bmi": 28.0,
+  "ap_hi": 124.0,
+  "ap_lo": 76.0,
+  "colesterol_total": 164.0,
+  "fuma": 0,
+  "diabetes": 0,
+  "egfr": 86.2,
+  "uacr": 8.0
+}

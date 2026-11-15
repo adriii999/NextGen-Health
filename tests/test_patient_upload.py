@@ -60,7 +60,7 @@ def test_upload_evaluates_with_real_model(http_client):
     assert response.status_code == 200
     data = response.json()
     assert data["datos_entrada"]["modo_evaluacion"] == "MODO_B"
-    assert len(data["evaluacion"]["tipos_riesgo"]) == 3
+    assert len(data["evaluacion"]["tipos_riesgo"]) == 5
     assert data["evaluacion"]["factores_clave"]
 
 

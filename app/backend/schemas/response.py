@@ -10,9 +10,11 @@ class RiesgoItem(BaseModel):
 
 
 class TiposRiesgo(BaseModel):
-    riesgo_aterosclerotico: RiesgoItem = Field(..., description="Riesgo ASCVD (Infarto / Ictus)")
-    riesgo_insuficiencia_cardiaca: RiesgoItem = Field(..., description="Riesgo de Insuficiencia Cardíaca")
-    riesgo_cardiorrenal: RiesgoItem = Field(..., description="Riesgo de Deterioro Renal Silencioso")
+    riesgo_aterosclerotico: RiesgoItem = Field(..., description="Riesgo coronario e isquémico (aterosclerosis, placa, infarto, ictus)")
+    riesgo_insuficiencia_cardiaca: RiesgoItem = Field(..., description="Riesgo de sobrecarga hemodinámica e insuficiencia cardíaca")
+    riesgo_cardiorrenal: RiesgoItem = Field(..., description="Riesgo de deterioro de función renal (filtrado glomerular / nefropatía)")
+    riesgo_microvascular: RiesgoItem = Field(..., description="Riesgo de daño microvascular y endotelial (albuminuria y rigidez arterial)")
+    riesgo_cardiometabolico: RiesgoItem = Field(..., description="Riesgo de descompensación cardiometabólica (obesidad, dislipidemia y diabetes)")
 
 
 class FactorClave(BaseModel):

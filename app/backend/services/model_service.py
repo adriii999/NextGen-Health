@@ -23,9 +23,11 @@ DEFAULT_FEATURE_NAMES = [
 ]
 
 DEFAULT_THRESHOLDS = {
-    "riesgo_aterosclerotico": 0.10,
-    "riesgo_insuficiencia_cardiaca": 0.08,
-    "riesgo_cardiorrenal": 0.12,
+    "riesgo_aterosclerotico": 0.25,
+    "riesgo_insuficiencia_cardiaca": 0.25,
+    "riesgo_cardiorrenal": 0.28,
+    "riesgo_microvascular": 0.28,
+    "riesgo_cardiometabolico": 0.28,
 }
 
 
@@ -121,21 +123,31 @@ class ModelService:
         features = lab_data.to_features_dict()
         probs = self._predict_with_real_model(features)
 
-        # Construir items de riesgo frente a sus umbrales
+        # Construir items de riesgo frente a sus umbrales (5 dominios clínicos CKM / KDIGO)
         ath_probability = probs["riesgo_aterosclerotico"]
         ath_val = round(ath_probability, 3)
-        ath_umb = self.thresholds.get("riesgo_aterosclerotico", 0.10)
+        ath_umb = self.thresholds.get("riesgo_aterosclerotico", 0.25)
         ath_alert = ath_probability >= ath_umb
 
         hf_probability = probs["riesgo_insuficiencia_cardiaca"]
         hf_val = round(hf_probability, 3)
-        hf_umb = self.thresholds.get("riesgo_insuficiencia_cardiaca", 0.08)
+        hf_umb = self.thresholds.get("riesgo_insuficiencia_cardiaca", 0.25)
         hf_alert = hf_probability >= hf_umb
 
         ren_probability = probs["riesgo_cardiorrenal"]
         ren_val = round(ren_probability, 3)
-        ren_umb = self.thresholds.get("riesgo_cardiorrenal", 0.12)
+        ren_umb = self.thresholds.get("riesgo_cardiorrenal", 0.28)
         ren_alert = ren_probability >= ren_umb
+
+        mic_probability = probs["riesgo_microvascular"]
+        mic_val = round(mic_probability, 3)
+        mic_umb = self.thresholds.get("riesgo_microvascular", 0.28)
+        mic_alert = mic_probability >= mic_umb
+
+        met_probability = probs["riesgo_cardiometabolico"]
+        met_val = round(met_probability, 3)
+        met_umb = self.thresholds.get("riesgo_cardiometabolico", 0.28)
+        met_alert = met_probability >= met_umb
 
         tipos_riesgo = TiposRiesgo(
             riesgo_aterosclerotico=RiesgoItem(
@@ -156,23 +168,37 @@ class ModelService:
                 alerta=ren_alert,
                 interpretacion=self._interpret_score(ren_val, ren_umb),
             ),
+            riesgo_microvascular=RiesgoItem(
+                valor=mic_val,
+                umbral=mic_umb,
+                alerta=mic_alert,
+                interpretacion=self._interpret_score(mic_val, mic_umb),
+            ),
+            riesgo_cardiometabolico=RiesgoItem(
+                valor=met_val,
+                umbral=met_umb,
+                alerta=met_alert,
+                interpretacion=self._interpret_score(met_val, met_umb),
+            ),
         )
 
-        hay_riesgo = ath_alert or hf_alert or ren_alert
+        hay_riesgo = ath_alert or hf_alert or ren_alert or mic_alert or met_alert
 
         perfil_renal = self._compute_kdigo_profile(features)
         motivos_prioridad = self._priority_reasons(
-            ath_alert, hf_alert, ren_alert, features, probs, perfil_renal
+            ath_alert, hf_alert, ren_alert, mic_alert, met_alert, features, probs, perfil_renal
         )
 
         # Explicar con TreeSHAP real: si hay alertas activas, priorizar los modelos en alerta;
-        # si no hay alertas (paciente bajo control), ejecutar TreeSHAP sobre los 3 modelos para
+        # si no hay alertas (paciente bajo control), ejecutar TreeSHAP sobre los 5 modelos para
         # mostrar factores protectores o parámetros limítrofes al médico de Atención Primaria.
         factor_candidates = []
         for risk_name, is_alert in (
             ("riesgo_aterosclerotico", ath_alert),
             ("riesgo_insuficiencia_cardiaca", hf_alert),
             ("riesgo_cardiorrenal", ren_alert),
+            ("riesgo_microvascular", mic_alert),
+            ("riesgo_cardiometabolico", met_alert),
         ):
             if hay_riesgo and not is_alert:
                 continue
@@ -222,7 +248,8 @@ class ModelService:
             )
 
         conclusion, recomendacion, prioridad = self._synthesize_verdict(
-            ath_alert, hf_alert, ren_alert, features, probs=probs, perfil_renal=perfil_renal
+            ath_alert, hf_alert, ren_alert, mic_alert, met_alert,
+            features, probs=probs, perfil_renal=perfil_renal
         )
 
         return EvaluationResponse(
@@ -256,12 +283,25 @@ class ModelService:
             return f"Moderado-Alto ({pct}%)"
         return f"Por debajo del umbral del modelo ({pct}%)"
 
-    def _priority_reasons(self, ath_alert, hf_alert, ren_alert, features, probs, perfil_renal):
-        reasons = [] if (ath_alert or hf_alert or ren_alert) else ["SIN_ALERTAS"]
+    def _priority_reasons(
+        self,
+        ath_alert: bool,
+        hf_alert: bool,
+        ren_alert: bool,
+        mic_alert: bool,
+        met_alert: bool,
+        features: Dict[str, Any],
+        probs: Dict[str, float],
+        perfil_renal: Optional[PerfilRenalKDIGO],
+    ):
+        any_alert = ath_alert or hf_alert or ren_alert or mic_alert or met_alert
+        reasons = [] if any_alert else ["SIN_ALERTAS"]
         for active, reason in (
             (ath_alert, "ALERTA_CIRCULACION"),
             (hf_alert, "ALERTA_CORAZON"),
             (ren_alert, "ALERTA_RINON_CORAZON"),
+            (mic_alert, "ALERTA_MICROVASCULAR"),
+            (met_alert, "ALERTA_CARDIOMETABOLICO"),
         ):
             if active:
                 reasons.append(reason)
@@ -274,8 +314,11 @@ class ModelService:
             reasons.append("PRESION_ALTA")
         if probs and max(probs.values()) >= 0.45:
             reasons.append("PUNTUACION_ALTA")
+        active_count = sum([ath_alert, hf_alert, ren_alert, mic_alert, met_alert])
         if ath_alert and hf_alert and ren_alert:
             reasons.append("TRES_ALERTAS")
+        if active_count >= 3:
+            reasons.append("MULTIPLES_ALERTAS")
         return reasons
 
     def _synthesize_verdict(
@@ -283,6 +326,8 @@ class ModelService:
         ath_alert: bool,
         hf_alert: bool,
         ren_alert: bool,
+        mic_alert: bool,
+        met_alert: bool,
         features: Dict[str, Any],
         probs: Optional[Dict[str, float]] = None,
         perfil_renal: Optional[PerfilRenalKDIGO] = None,
@@ -294,21 +339,36 @@ class ModelService:
             delta_egfr = features.get("delta_egfr")
             if delta_egfr is not None and not np.isnan(delta_egfr) and delta_egfr <= -5.0:
                 conclusions.append(
-                    "alerta en la evaluación del riñón y el corazón"
+                    "alerta en la evaluación de función renal (filtrado glomerular)"
                 )
                 prioridad = "ALTA"
             else:
-                conclusions.append("alerta en la evaluación del riñón y el corazón")
+                conclusions.append("alerta en la evaluación de función renal (filtrado glomerular)")
+
+        if mic_alert:
+            conclusions.append("alerta en la evaluación de daño microvascular y endotelial")
 
         if hf_alert:
-            conclusions.append("alerta en la evaluación de insuficiencia cardíaca")
+            conclusions.append("alerta en la evaluación de sobrecarga e insuficiencia cardíaca")
 
         if ath_alert:
-            conclusions.append("alerta en la evaluación de la circulación")
+            conclusions.append("alerta en la evaluación coronaria e isquemia")
+
+        if met_alert:
+            conclusions.append("alerta en la evaluación de descompensación cardiometabólica")
 
         # Criterios clínicos de Atención Primaria para triaje de Prioridad ALTA en Modo A y Modo B:
-        reasons = self._priority_reasons(ath_alert, hf_alert, ren_alert, features, probs, perfil_renal)
-        if set(reasons) & {"DESCENSO_RAPIDO", "RIESGO_RENAL_ALTO", "PRESION_ALTA", "PUNTUACION_ALTA", "TRES_ALERTAS"}:
+        reasons = self._priority_reasons(
+            ath_alert, hf_alert, ren_alert, mic_alert, met_alert, features, probs, perfil_renal
+        )
+        if set(reasons) & {
+            "DESCENSO_RAPIDO",
+            "RIESGO_RENAL_ALTO",
+            "PRESION_ALTA",
+            "PUNTUACION_ALTA",
+            "TRES_ALERTAS",
+            "MULTIPLES_ALERTAS",
+        }:
             prioridad = "ALTA"
 
         conclusion_txt = (

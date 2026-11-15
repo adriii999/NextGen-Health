@@ -104,21 +104,33 @@ def test_evaluation_response_schema():
         "tipos_riesgo": {
             "riesgo_aterosclerotico": {
                 "valor": 0.08,
-                "umbral": 0.10,
+                "umbral": 0.25,
                 "alerta": False,
                 "interpretacion": "Bajo",
             },
             "riesgo_insuficiencia_cardiaca": {
-                "valor": 0.14,
-                "umbral": 0.08,
+                "valor": 0.34,
+                "umbral": 0.28,
                 "alerta": True,
                 "interpretacion": "Moderado-Alto",
             },
             "riesgo_cardiorrenal": {
-                "valor": 0.22,
-                "umbral": 0.12,
+                "valor": 0.52,
+                "umbral": 0.30,
                 "alerta": True,
                 "interpretacion": "Alto",
+            },
+            "riesgo_microvascular": {
+                "valor": 0.41,
+                "umbral": 0.28,
+                "alerta": True,
+                "interpretacion": "Alto",
+            },
+            "riesgo_cardiometabolico": {
+                "valor": 0.12,
+                "umbral": 0.30,
+                "alerta": False,
+                "interpretacion": "Bajo",
             },
         },
         "factores_clave": [
